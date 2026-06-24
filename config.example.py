@@ -11,6 +11,12 @@ REPORT_URL = "https://myepg.org/Zhejiang_Unicast/report"
 EXTERNAL_MCAST_M3U_URL = "https://myepg.org/api/subscribe/multicast/m3u?udpxy=192.168.1.1:6688&logo=192.168.1.3:6688"
 
 # IPTV 模拟机顶盒基础参数
+LOGIN_MODE = "simple"  # 登录模式选择: "simple" (使用固定凭证) 或 "dynamic" (使用 DES 动态算密)
+
+# 动态登录特有参数 (当 LOGIN_MODE = "dynamic" 时必填)
+IPTV_IP = "xxx.xx.xx.xx"
+IPTV_DES_KEY = "xxxxxxxx"
+
 IPTV_BASE_URL = "http://xxx.xx.xx.xx:33200"
 IPTV_USER_ID = ""
 IPTV_AUTHENTICATOR = ""

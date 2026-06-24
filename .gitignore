@@ -1,5 +1,6 @@
 # 忽略包含敏感参数的真实配置文件
 config.py
+sample/
 
 # 顺便忽略 Python 运行时生成的缓存文件
 __pycache__/

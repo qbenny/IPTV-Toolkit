@@ -1,20 +1,24 @@
 import os
 import config
 import m3u_utils
+import auth_handler
 
 def run():
     # 第一步：获取本地机顶盒 IPTV 原始节目列表
     print(">>> [步骤 1] 开始模拟机顶盒获取本地频道列表...")
-    session = m3u_utils.login_iptv_session(
+    session, final_base_url, user_token = auth_handler.login(
+        login_mode=config.LOGIN_MODE,
         base_url=config.IPTV_BASE_URL,
         user_id=config.IPTV_USER_ID,
         headers=config.HEADERS_COMMON,
-        authenticator=config.IPTV_AUTHENTICATOR,
         stbid=config.IPTV_STBID,
+        mac=config.IPTV_MAC,
+        authenticator=config.IPTV_AUTHENTICATOR,
         user_token=config.IPTV_USER_TOKEN,
+        ip=config.IPTV_IP,
+        des_key=config.IPTV_DES_KEY,
         stb_type=config.IPTV_STB_TYPE,
         stb_version=config.IPTV_STB_VERSION,
-        mac=config.IPTV_MAC,
         software_version=config.IPTV_SOFTWARE_VERSION,
         area_id=config.IPTV_AREA_ID,
         user_group_id=config.IPTV_USER_GROUP_ID,
@@ -23,10 +27,10 @@ def run():
     )
     raw_channel_text = m3u_utils.fetch_local_channels_raw(
         session=session,
-        base_url=config.IPTV_BASE_URL,
+        base_url=final_base_url,
         user_id=config.IPTV_USER_ID,
         stbid=config.IPTV_STBID,
-        user_token=config.IPTV_USER_TOKEN,
+        user_token=user_token,
         headers=config.HEADERS_COMMON,
         timeout=config.HTTP_TIMEOUT
     )
