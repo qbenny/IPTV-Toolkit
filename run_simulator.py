@@ -1,56 +1,74 @@
 import logging
-import random
 import re
 import time
 import ast
 import json
 import os
+import socket
 import sys
 import subprocess
 from urllib.parse import urlparse
 import requests
 from typing import Optional
 
-_IPTV_IP_DETECT_URL = "http://192.168.1.1/iptv_ip.txt"
-
-
-def get_iptv_local_ip() -> str:
+def get_all_local_ips() -> list:
     """
-    真实 IP 模式下探测本机 IPTV 出网 IP。
-    方法 1：扫描本地网卡接口，寻找 10.x.x.x 网段的 IPTV 专网 IP（OpenWrt 部署）。
-    方法 2：HTTP GET _IPTV_IP_DETECT_URL，读取响应体文本作为 IP（Docker 部署）。
-    两种都失败则报错。
+    搜集本地所有网口配置的 IPv4 地址列表，兼容 Windows 与 Linux/OpenWrt
     """
-    # 方法 1：扫描本地网卡
     ips = []
     try:
         if sys.platform.startswith("win"):
             out = subprocess.check_output("ipconfig", shell=True).decode("gbk", errors="ignore")
-            ips = re.findall(r"IPv4 地址[.\s]*:\s*([0-9.]+)", out)
+            ips = re.findall(r"IPv4 地址[\.\s]*:\s*([0-9\.]+)", out)
             if not ips:
-                ips = re.findall(r"IPv4 Address[.\s]*:\s*([0-9.]+)", out)
+                ips = re.findall(r"IPv4 Address[\.\s]*:\s*([0-9\.]+)", out)
         else:
             out = subprocess.check_output("ip addr", shell=True).decode("utf-8", errors="ignore")
-            ips = re.findall(r"inet\s+([0-9.]+)/", out)
-        for ip in ips:
-            ip = ip.strip()
-            if ip and ip.startswith("10."):
-                return ip
+            ips = re.findall(r"inet\s+([0-9\.]+)/", out)
     except Exception:
         pass
+    
+    if not ips:
+        try:
+            hostname = socket.gethostname()
+            _, _, ip_list = socket.gethostbyname_ex(hostname)
+            ips.extend(ip_list)
+        except Exception:
+            pass
+            
+    cleaned_ips = []
+    for ip in ips:
+        if ip and ip.strip() and ip not in cleaned_ips and not ip.startswith("127."):
+            cleaned_ips.append(ip.strip())
+    return cleaned_ips
 
-    # 方法 2：HTTP GET 固定 URL
+def get_iptv_local_ip(base_url: str) -> str:
+    """
+    动态获取机顶盒本地 IPTV IP。
+    优先扫描本地所有网卡接口，寻找代表 IPTV 专网的 10.x.x.x 私网 IP 地址。
+    如果没找到，则通过连接目标 EPG 网关的 UDP 端口，由操作系统路由表动态选定出网 IP。
+    """
     try:
-        resp = requests.get(_IPTV_IP_DETECT_URL, timeout=5)
-        resp.raise_for_status()
-        ip = resp.text.strip()
-        if ip:
-            return ip
-    except Exception:
-        pass
-
-    raise RuntimeError("无法探测 IPTV 出网 IP：本地网卡未找到 10.x.x.x 网段，"
-                       f"且 {_IPTV_IP_DETECT_URL} 不可达")
+        local_ips = get_all_local_ips()
+        
+        # 1. 优先寻找 10.x.x.x 网段的真实 IPTV 网卡 IP
+        for ip in local_ips:
+            if ip.startswith("10."):
+                return ip
+                
+        # 2. 回退机制：通过连接 EPG 服务器的 UDP Socket 检测操作系统路由出网口 IP
+        parsed = urlparse(base_url)
+        hostname = parsed.hostname or "218.71.130.66"
+        port = parsed.port or 33200
+        
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((socket.gethostbyname(hostname), port))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception as e:
+        logging.error("自动获取 IPTV 本地 IP 失败: %s，回退到空值", e)
+        return ""
 
 def load_stb_config() -> dict:
     """
@@ -64,7 +82,7 @@ def load_stb_config() -> dict:
             with open(config_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            print(f">>> [Config] 读取 stb_config.json 失败: {e}")
+            logging.error("读取 stb_config.json 失败: %s", e)
     
     # 默认备用参数（占位符）
     return {
@@ -126,13 +144,11 @@ class STBDeviceConfig:
         self.stb_id = stb_id
         self.mac_address = mac_address  # 格式: "20:28:3E:AF:16:FC"
         if not ip_address:
-            # 真实 IP 模式：自动探测 IPTV 出网 IP
-            self.real_ip_mode = True
-            ip_address = get_iptv_local_ip()
-            print(f">>> [IPTV IP] 真实 IP 模式，自动探测: {ip_address}")
+            ip_address = get_iptv_local_ip(base_url)
+            print(f">>> [STB Config] 动态探测并绑定出网口 IPTV IP: {ip_address}")
+            logging.info("自动获取出网口 IPTV IP: %s", ip_address)
         else:
-            self.real_ip_mode = False
-            print(f">>> [IPTV IP] 固定 IP 模式: {ip_address}")
+            print(f">>> [STB Config] 使用配置文件指定的静态 IP: {ip_address}")
         self.ip_address = ip_address
         self.base_url = base_url        # 初始网关地址，例如: http://218.71.130.66:33200
         self.des_key = des_key
@@ -222,8 +238,8 @@ class STBSimulator:
         if DES is None:
             raise ImportError("未检测到 Crypto.Cipher 加密模块！请安装 pycryptodome 库（pip install pycryptodome）以进行动态签名计算。")
 
-        # 随机串（模拟真实机顶盒每次认证生成的随机盐值）
-        rand_str = str(random.randint(10000, 99999))
+        # 随机串
+        rand_str = "99999"
         
         # 拼接格式: {rand_str}${encrypt_token}${user_id}${stbid}${ip}${mac}$$CTC
         session_ref = (
@@ -268,14 +284,17 @@ class STBSimulator:
                     vis_ip = unicom_ip if operator == "unicom" else telecom_ip
                     vis_base_url = f"http://{vis_ip}/epg/"
                     self.logger.info("VIS 服务器地址解析成功 (%s 线路): %s", operator, vis_base_url)
+                    print(f">>> [VIS Domain] Resolved ({operator}): {vis_base_url}")
                     return vis_base_url
                 else:
                     self.logger.warning("VIS 服务器地址正则匹配失败")
-                    self.logger.debug(">>> [VIS Domain] Regex match failed in configUrl.min.js")
+                    print(">>> [VIS Domain] Regex match failed in configUrl.min.js")
             else:
                 self.logger.warning("configUrl.min.js 获取失败 HTTP %d", r.status_code)
+                print(f">>> [VIS Domain] configUrl.min.js HTTP {r.status_code}")
         except Exception as e:
             self.logger.warning("VIS 服务器地址解析失败: %s", e)
+            print(f">>> [VIS Domain] Resolution error: {e}")
         return None
 
     def login(self) -> bool:
@@ -403,21 +422,6 @@ class STBSimulator:
             return
 
         self.logger.info("心跳时间窗口到达，上报机顶盒状态...")
-
-        # 真实 IP 模式下，检测出网 IP 是否发生变更
-        if self.config.real_ip_mode:
-            try:
-                current_ip = get_iptv_local_ip()
-                if current_ip != self.config.ip_address:
-                    self.logger.warning("IPTV 出网 IP 变更: %s → %s，清除认证状态以触发重登录",
-                                        self.config.ip_address, current_ip)
-                    self.config.ip_address = current_ip
-                    self.state.clear_auth_state()
-                    return
-            except Exception as e:
-                self.logger.warning("IP 变动检测失败: %s，跳过本次心跳", e)
-                return
-
         heartbeat_url = f"{self.state.epg_base_url}/EPG/jsp/GetHeartBit"
         params = {
             "UserStatus": "1",

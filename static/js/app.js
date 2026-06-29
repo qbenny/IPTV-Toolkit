@@ -258,11 +258,7 @@ const app = createApp({
             try {
                 const response = await fetch('/api/sim-status');
                 if (response.ok) {
-                    const data = await response.json();
-                    this.simStatus = data;
-                    if (data.ip_address) {
-                        this.resolvedIp = data.ip_address;
-                    }
+                    this.simStatus = await response.json();
                 }
             } catch (error) {
                 // Silent fail - don't spam errors in console
