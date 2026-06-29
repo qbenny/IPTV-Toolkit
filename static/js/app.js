@@ -286,8 +286,27 @@ const app = createApp({
         
         async copyToClipboard(text) {
             try {
-                await navigator.clipboard.writeText(text);
-                this.showToast('已复制到剪贴板 ✓', 'success');
+                // 优先使用现代 Clipboard API（HTTPS / localhost 环境）
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    this.showToast('已复制到剪贴板 ✓', 'success');
+                    return;
+                }
+                // 降级方案：使用 execCommand（兼容 HTTP 环境）
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                const success = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (success) {
+                    this.showToast('已复制到剪贴板 ✓', 'success');
+                } else {
+                    this.showToast('复制失败，请手动复制', 'error');
+                }
             } catch (e) {
                 this.showToast('复制失败，请手动复制', 'error');
             }
