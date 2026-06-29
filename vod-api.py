@@ -905,25 +905,36 @@ async def handle_tvbox_request(request: Request):
                     content = series_info.get("introduce") or "热播剧集专区"
                     episode_list = series_info.get("episodes", [])
                     
+                    # Determine if any episodes will be skipped (EPG "缺" data)
+                    total_count = len(episode_list)
+                    valid_count = sum(
+                        1 for ep in episode_list
+                        if ep.get("id") and str(ep.get("id")) != "缺"
+                        and "缺" not in str(ep.get("id"))
+                        and str(ep.get("id")).isdigit()
+                    )
+                    use_original_num = (valid_count == total_count)  # no skipping → keep EPG num
+
                     ep_play_urls = []
-                    for idx, ep in enumerate(episode_list):
+                    display_num = 0
+                    for ep in episode_list:
                         ep_id = ep.get("id")
-                        num_str = ep.get("num")
-                        if num_str and num_str.isdigit():
-                            ep_num = int(num_str)
-                        else:
-                            ep_num = idx + 1
-                        
-                        # Handle placeholder / missing episodes (EPG returns "缺" or non-digit IDs)
+
+                        # Skip placeholder / missing episodes (EPG returns "缺" or non-digit IDs)
                         if not ep_id or ep_id == "缺" or "缺" in ep_id or not ep_id.isdigit():
-                            ep_play_urls.append(f"第{ep_num}集(缺)$")
+                            continue
+
+                        display_num += 1
+                        num_str = ep.get("num") if use_original_num else str(display_num)
+                        if not num_str or not num_str.isdigit():
+                            num_str = str(display_num)
+
+                        telecom_code = ep.get("telecom_code", "")
+                        if telecom_code:
+                            play_url = f"{ep_id}${telecom_code}"
                         else:
-                            telecom_code = ep.get("telecom_code", "")
-                            if telecom_code:
-                                play_url = f"{ep_id}${telecom_code}"
-                            else:
-                                play_url = ep_id
-                            ep_play_urls.append(f"第{ep_num}集${play_url}")
+                            play_url = ep_id
+                        ep_play_urls.append(f"第{num_str}集${play_url}")
                         
                     with poster_lock:
                         pic_url = poster_cache.get(current_id) or ""
