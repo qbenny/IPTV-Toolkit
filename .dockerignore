@@ -20,6 +20,7 @@ sample/
 scratch/
 research_and_debug/
 codebuddy/
+tests/
 
 # Docker 自身
 Dockerfile

@@ -1,0 +1,183 @@
+2026-07-01 11:00:36 [INFO] === Step 1 测试: 日志模块正常 ===
+2026-07-01 11:01:10 [INFO] Test 1 通过: 标准 JSON 解析正常
+2026-07-01 11:01:10 [INFO] Test 2 通过: 非标准 JSON 解析正常
+2026-07-01 11:01:10 [INFO] Test 3 通过: 单引号键值解析正常
+2026-07-01 11:01:10 [INFO] Test 4 通过: 非法输入返回空字典
+2026-07-01 11:01:10 [INFO] Test 5 通过: 日志文件路径 D:\Software\IPTV-Toolkit\src\utils\..\..\data\iptv_toolkit.log
+2026-07-01 11:01:10 [INFO] === Step 1 全部测试通过 ===
+2026-07-01 11:02:46 [INFO] [DB] 清理 2 条过期数据
+2026-07-01 11:04:07 [INFO] === Step 3 开始测试 ===
+2026-07-01 11:04:07 [INFO] Test 1 通过: STBDeviceConfig 导入成功
+2026-07-01 11:04:07 [INFO] Test 2 通过: STBRuntimeState 导入成功
+2026-07-01 11:04:07 [INFO] Test 3 通过: STBDeviceConfig 实例化正确
+2026-07-01 11:04:07 [INFO] Test 4 通过: STBRuntimeState 初始化正确
+2026-07-01 11:04:07 [INFO] Test 5 通过: clear_auth_state 正确
+2026-07-01 11:04:07 [INFO] Test 6 通过: STBSimulator 导入成功
+2026-07-01 11:04:07 [INFO] Test 7 通过: STBSimulator 实例化正确
+2026-07-01 11:04:07 [INFO] Test 8 通过: heartbeat 模块导入成功
+2026-07-01 11:04:07 [INFO] Test 9 通过: headers 配置正确
+2026-07-01 11:04:07 [INFO] === Step 3 全部测试通过 ===
+2026-07-01 11:04:54 [INFO] === Step 4 开始测试 ===
+2026-07-01 11:04:54 [INFO] Test 1 通过: sync_status 初始状态正确
+2026-07-01 11:04:54 [INFO] Test 2 通过: VIS_HEADERS 配置正确
+2026-07-01 11:04:54 [INFO] Test 3 通过: 同步函数导入成功
+2026-07-01 11:04:54 [INFO] Test 4 通过: 同步类型列表正确 (5 个)
+2026-07-01 11:04:54 [INFO] === Step 4 全部测试通过 ===
+2026-07-01 11:05:42 [INFO] === Step 5 开始测试 ===
+2026-07-01 11:05:43 [INFO] Test 1 通过: tvbox 模块导入成功
+2026-07-01 11:05:43 [INFO] Test 2 通过: FILTER_CONFIG 结构正确
+2026-07-01 11:05:43 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2020-2029'}
+2026-07-01 11:05:43 [INFO] Test 3 通过: Base64 过滤器解析正确
+2026-07-01 11:05:43 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2020-2029'}
+2026-07-01 11:05:43 [INFO] Test 4 通过: JSON 过滤器解析正确
+2026-07-01 11:05:43 [INFO] Test 5 通过: 空值处理正确
+2026-07-01 11:05:43 [INFO] Test 6 通过: play 模块导入成功
+2026-07-01 11:05:43 [INFO] Test 7 通过: 模拟器实例注入正确
+2026-07-01 11:05:43 [INFO] === Step 5 全部测试通过 ===
+2026-07-01 11:06:17 [INFO] === Step 6 开始测试 ===
+2026-07-01 11:06:17 [INFO] Test 1 通过: routes 模块导入成功
+2026-07-01 11:06:17 [INFO] Test 2 通过: router 是 APIRouter 实例
+2026-07-01 11:06:17 [INFO] Test 3 通过: _load_stb_config 返回正确结构
+2026-07-01 11:06:17 [INFO] Test 4 通过: set_simulator 正常
+2026-07-01 11:06:17 [INFO] Test 5 通过: set_login_func 正常
+2026-07-01 11:06:17 [INFO]   Route: {'GET'} /settings
+2026-07-01 11:06:17 [INFO]   Route: {'GET'} /api/stb-config
+2026-07-01 11:06:17 [INFO]   Route: {'GET'} /api/sim-status
+2026-07-01 11:06:17 [INFO]   Route: {'POST'} /api/stb-config
+2026-07-01 11:06:17 [INFO]   Route: {'POST'} /api/sync/start
+2026-07-01 11:06:17 [INFO]   Route: {'GET'} /api/sync/status
+2026-07-01 11:06:17 [INFO]   Route: {'GET'} /api/sync/stats
+2026-07-01 11:06:17 [INFO]   Route: {'GET'} /api/logs
+2026-07-01 11:06:17 [INFO]   Route: {'POST'} /api/logs/clear
+2026-07-01 11:06:17 [INFO] Test 6 通过: 路由注册正常 (9 个路由)
+2026-07-01 11:06:17 [INFO] === Step 6 全部测试通过 ===
+2026-07-01 11:08:28 [INFO] ========================================
+2026-07-01 11:08:28 [INFO] IPTV-Toolkit 启动中...
+2026-07-01 11:08:28 [INFO] Web UI: http://localhost:8880/settings
+2026-07-01 11:08:28 [INFO] TVBox API: http://localhost:8880/api/vod
+2026-07-01 11:08:28 [INFO] ========================================
+2026-07-01 11:08:28 [WARNING] >>> [STB] 核心认证参数缺失，跳过自动登录
+2026-07-01 11:08:33 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:08:51 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:10:18 [INFO] ========================================
+2026-07-01 11:10:18 [INFO] IPTV-Toolkit 启动中...
+2026-07-01 11:10:18 [INFO] Web UI: http://localhost:8880/settings
+2026-07-01 11:10:18 [INFO] TVBox API: http://localhost:8880/api/vod
+2026-07-01 11:10:18 [INFO] ========================================
+2026-07-01 11:10:18 [WARNING] >>> [STB] 核心认证参数缺失，跳过自动登录
+2026-07-01 11:10:34 [INFO] [TVBox] ac=list, t=series, pg=1, wd=, ids=
+2026-07-01 11:13:15 [INFO] ========================================
+2026-07-01 11:13:15 [INFO] IPTV-Toolkit 启动中...
+2026-07-01 11:13:15 [INFO] Web UI: http://localhost:8880/settings
+2026-07-01 11:13:15 [INFO] TVBox API: http://localhost:8880/api/vod
+2026-07-01 11:13:15 [INFO] ========================================
+2026-07-01 11:13:15 [WARNING] >>> [STB] 核心认证参数缺失，跳过自动登录
+2026-07-01 11:18:25 [INFO] ========================================
+2026-07-01 11:18:25 [INFO] IPTV-Toolkit 启动中...
+2026-07-01 11:18:25 [INFO] Web UI: http://localhost:8880/settings
+2026-07-01 11:18:25 [INFO] TVBox API: http://localhost:8880/api/vod
+2026-07-01 11:18:25 [INFO] ========================================
+2026-07-01 11:18:25 [WARNING] >>> [STB] 核心认证参数缺失，跳过自动登录
+2026-07-01 11:19:00 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:19:02 [INFO] [TVBox] ac=list, t=series, pg=1, wd=, ids=
+2026-07-01 11:19:16 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:19:18 [INFO] [TVBox] ac=list, t=series, pg=1, wd=, ids=
+2026-07-01 11:19:20 [INFO] [TVBox] ac=list, t=, pg=1, wd=白, ids=
+2026-07-01 11:19:22 [INFO] [TVBox] ac=list, t=series, pg=1, wd=, ids=
+2026-07-01 11:19:22 [INFO] [TVBox] Parsed filters from 'f': {'country': '日本'}
+2026-07-01 11:19:24 [INFO] [TVBox] ac=list, t=series, pg=1, wd=, ids=
+2026-07-01 11:19:24 [INFO] [TVBox] Parsed filters from 'f': {'year': '2020-2029'}
+2026-07-01 11:19:26 [INFO] [TVBox] ac=list, t=series, pg=1, wd=, ids=
+2026-07-01 11:19:26 [INFO] [TVBox] Parsed filters from 'f': {'country': '日本', 'year': '2020-2029'}
+2026-07-01 11:33:13 [INFO] ========================================
+2026-07-01 11:33:13 [INFO] IPTV-Toolkit 启动中...
+2026-07-01 11:33:13 [INFO] Web UI: http://localhost:8880/settings
+2026-07-01 11:33:13 [INFO] TVBox API: http://localhost:8880/api/vod
+2026-07-01 11:33:13 [INFO] ========================================
+2026-07-01 11:33:13 [WARNING] >>> [STB] 核心认证参数缺失，跳过自动登录
+2026-07-01 11:43:54 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:43:57 [INFO] [TVBox] ac=detail, t=movies, pg=1, wd=, ids=
+2026-07-01 11:43:59 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:44:01 [INFO] [TVBox] ac=detail, t=, pg=1, wd=, ids=series_6c2d728fbc7fdff1e0ffa36f03e4bbc3
+2026-07-01 11:44:08 [INFO] [TVBox] ac=detail, t=series, pg=2, wd=, ids=
+2026-07-01 11:44:29 [INFO] [TVBox] ac=detail, t=series, pg=3, wd=, ids=
+2026-07-01 11:45:36 [INFO] [TVBox] ac=detail, t=, pg=1, wd=, ids=series_eaa2027310a9835167a6913186bb7f61
+2026-07-01 11:45:51 [INFO] [TVBox] ac=detail, t=, pg=1, wd=白色, ids=
+2026-07-01 11:46:09 [INFO] [TVBox] ac=detail, t=, pg=1, wd=, ids=series_755507e22b93dfb1350925b6da778c3c
+2026-07-01 11:46:46 [INFO] [TVBox] ac=detail, t=movies, pg=1, wd=, ids=
+2026-07-01 11:46:56 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:46:56 [INFO] [TVBox] ac=detail, t=movies, pg=1, wd=, ids=
+2026-07-01 11:53:55 [INFO] ========================================
+2026-07-01 11:53:55 [INFO] IPTV-Toolkit 启动中...
+2026-07-01 11:53:55 [INFO] Web UI: http://localhost:8880/settings
+2026-07-01 11:53:55 [INFO] TVBox API: http://localhost:8880/api/vod
+2026-07-01 11:53:55 [INFO] ========================================
+2026-07-01 11:53:55 [WARNING] >>> [STB] 核心认证参数缺失，跳过自动登录
+2026-07-01 11:54:09 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:13 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:54:20 [INFO] [TVBox] ac=, t=, pg=1, wd=, ids=
+2026-07-01 11:54:22 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:26 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:26 [INFO] [TVBox] Parsed filters from 'f': {'country': '日本'}
+2026-07-01 11:54:37 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:37 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国'}
+2026-07-01 11:54:40 [INFO] [TVBox] ac=detail, t=series, pg=2, wd=, ids=
+2026-07-01 11:54:40 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国'}
+2026-07-01 11:54:47 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:47 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2024'}
+2026-07-01 11:54:49 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:49 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2023'}
+2026-07-01 11:54:49 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:49 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2020-2029'}
+2026-07-01 11:54:50 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:50 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2010-2019'}
+2026-07-01 11:54:51 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:51 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2000-2009'}
+2026-07-01 11:54:53 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:53 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '1900-1999'}
+2026-07-01 11:54:55 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:55 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': ''}
+2026-07-01 11:54:55 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:55 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2024'}
+2026-07-01 11:54:56 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:56 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2023'}
+2026-07-01 11:54:57 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:57 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2020-2029'}
+2026-07-01 11:54:58 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:58 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2010-2019'}
+2026-07-01 11:54:59 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:54:59 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2000-2009'}
+2026-07-01 11:55:00 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:00 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '1900-1999'}
+2026-07-01 11:55:01 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:01 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2000-2009'}
+2026-07-01 11:55:02 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:02 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2010-2019'}
+2026-07-01 11:55:09 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:09 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2024'}
+2026-07-01 11:55:10 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:10 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2023'}
+2026-07-01 11:55:10 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:10 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2020-2029'}
+2026-07-01 11:55:10 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:10 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2010-2019'}
+2026-07-01 11:55:11 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:11 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '2000-2009'}
+2026-07-01 11:55:13 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:13 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': '1900-1999'}
+2026-07-01 11:55:14 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:14 [INFO] [TVBox] Parsed filters from 'f': {'country': '内地', 'year': '1900-1999'}
+2026-07-01 11:55:16 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:16 [INFO] [TVBox] Parsed filters from 'f': {'country': '英国', 'year': '1900-1999'}
+2026-07-01 11:55:17 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:17 [INFO] [TVBox] Parsed filters from 'f': {'country': '其他', 'year': '1900-1999'}
+2026-07-01 11:55:17 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:17 [INFO] [TVBox] Parsed filters from 'f': {'country': '', 'year': '1900-1999'}
+2026-07-01 11:55:19 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:19 [INFO] [TVBox] Parsed filters from 'f': {'country': '', 'year': ''}
+2026-07-01 11:55:20 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:20 [INFO] [TVBox] Parsed filters from 'f': {'country': '美国', 'year': ''}
+2026-07-01 11:55:22 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:22 [INFO] [TVBox] Parsed filters from 'f': {'country': '内地', 'year': ''}
+2026-07-01 11:55:29 [INFO] [TVBox] ac=detail, t=series, pg=1, wd=, ids=
+2026-07-01 11:55:29 [INFO] [TVBox] Parsed filters from 'f': {'country': '日本', 'year': ''}

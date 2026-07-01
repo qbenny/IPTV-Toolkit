@@ -4,16 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPTV & VOD 管理面板</title>
-    <!-- 引入谷歌字体 Outfit -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=1.5">
-    <!-- 本地依赖库 -->
+    <link rel="stylesheet" href="css/style.css?v=2.0">
     <script src="js/vue.global.js"></script>
-    <script src="js/Sortable.min.js"></script>
 </head>
 <body>
     <div id="app" v-cloak>
-        <!-- 侧边栏/导航栏 -->
+        <!-- 侧边栏导航 -->
         <aside class="sidebar">
             <div class="brand">
                 <span class="logo-icon">📺</span>
@@ -24,11 +21,11 @@
                 <a href="#" :class="['nav-item', { active: activeTab === 'stb' }]" @click.prevent="activeTab = 'stb'">
                     <span class="nav-icon">⚙️</span> 系统凭证配置
                 </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'vod' }]" @click.prevent="activeTab = 'vod'">
-                    <span class="nav-icon">📁</span> VOD 分类映射
+                <a href="#" :class="['nav-item', { active: activeTab === 'sync' }]" @click.prevent="activeTab = 'sync'">
+                    <span class="nav-icon">🔄</span> 数据同步管理
                 </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'live' }]" @click.prevent="activeTab = 'live'">
-                    <span class="nav-icon">📡</span> 直播 & EPG
+                <a href="#" :class="['nav-item', { active: activeTab === 'log' }]" @click.prevent="activeTab = 'log'">
+                    <span class="nav-icon">📋</span> 系统日志
                 </a>
             </nav>
 
@@ -48,7 +45,7 @@
                     <p class="header-subtitle">{{ tabSubtitles[activeTab] }}</p>
                 </div>
                 <transition name="fade-slide">
-                    <div v-if="activeTab === 'vod'" class="api-links-panel">
+                    <div v-if="activeTab === 'sync'" class="api-links-panel">
                         <div class="api-link-item">
                             <span class="api-link-label">📦 TVBox 订阅</span>
                             <code class="api-link-url" :title="vodApiLinks.tvbox">{{ vodApiLinks.tvbox }}</code>
@@ -63,7 +60,7 @@
                 </transition>
             </header>
 
-            <!-- 提示信息通知组件 -->
+            <!-- 提示信息通知 -->
             <transition name="slide-down">
                 <div v-if="toast.show" :class="['toast-notification', toast.type]">
                     <span class="toast-icon">{{ toast.type === 'success' ? '✅' : '❌' }}</span>
@@ -74,7 +71,6 @@
             <!-- 板块一：系统凭证配置 -->
             <section v-if="activeTab === 'stb'" class="tab-pane">
                 <div class="card-grid">
-                    <!-- 凭证表单 -->
                     <div class="card form-card">
                         <div class="card-header">
                             <h3>机顶盒鉴权参数</h3>
@@ -114,7 +110,6 @@
                         </div>
                     </div>
 
-                    <!-- 状态展示栏 -->
                     <div class="card status-card">
                         <div class="card-header">
                             <h3>仿真鉴权运行状态</h3>
@@ -146,7 +141,7 @@
                                 <span class="status-label">JSESSIONID</span>
                                 <span class="status-val token-val" v-if="simStatus.jsessionid" :title="simStatus.jsessionid">
                                     <span class="token-text">{{ maskToken(simStatus.jsessionid) }}</span>
-                                    <button class="copy-btn" @click="copyToClipboard(simStatus.jsessionid)" title="复制完整 JSESSIONID">📋</button>
+                                    <button class="copy-btn" @click="copyToClipboard(simStatus.jsessionid)" title="复制">📋</button>
                                 </span>
                                 <span class="status-val text-muted" v-else>—</span>
                             </div>
@@ -154,19 +149,93 @@
                                 <span class="status-label">UserToken</span>
                                 <span class="status-val token-val" v-if="simStatus.user_token" :title="simStatus.user_token">
                                     <span class="token-text">{{ maskToken(simStatus.user_token) }}</span>
-                                    <button class="copy-btn" @click="copyToClipboard(simStatus.user_token)" title="复制完整 UserToken">📋</button>
+                                    <button class="copy-btn" @click="copyToClipboard(simStatus.user_token)" title="复制">📋</button>
                                 </span>
                                 <span class="status-val text-muted" v-else>—</span>
                             </div>
                             <div class="status-item">
                                 <span class="status-label">说明</span>
-                                <p class="status-desc">机顶盒配置用于与电信 EPG 网关建立安全链路以获取直播地址及点播图片、播放 URL。建议直接保持 IP 地址为空，以允许程序根据宿主机当前连通 EPG 节点的路由状况自动生成正确的源 IP。</p>
+                                <p class="status-desc">机顶盒配置用于与电信 EPG 网关建立安全链路以获取点播播放 URL。建议直接保持 IP 地址为空，以允许程序根据宿主机当前连通 EPG 节点的路由状况自动生成正确的源 IP。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 板块二：数据同步管理 -->
+            <section v-if="activeTab === 'sync'" class="tab-pane">
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>数据同步控制</h3>
+                        </div>
+                        <div class="status-list" style="margin-top: 15px;">
+                            <div class="status-item">
+                                <span class="status-label">同步状态</span>
+                                <span :class="['status-val', syncStatus.running ? 'text-warning' : 'text-success']">
+                                    {{ syncStatus.running ? '⏳ 同步中...' : (syncStatus.last_sync_time ? '✅ 已同步' : '⭕ 未同步') }}
+                                </span>
+                            </div>
+                            <div class="status-item" v-if="syncStatus.running">
+                                <span class="status-label">当前进度</span>
+                                <span class="status-val highlight">{{ syncStatus.progress }}</span>
+                            </div>
+                            <div class="status-item" v-if="syncStatus.last_sync_time">
+                                <span class="status-label">上次同步</span>
+                                <span class="status-val">{{ formatTime(syncStatus.last_sync_time) }}</span>
+                            </div>
+                            <div class="status-item" v-if="syncStatus.last_error">
+                                <span class="status-label">错误信息</span>
+                                <span class="status-val text-error">{{ syncStatus.last_error }}</span>
+                            </div>
+                        </div>
+                        <div class="form-actions" style="margin-top: 20px;">
+                            <button class="btn btn-primary" @click="triggerSync" :disabled="syncStatus.running || !simStatus.is_authenticated" style="width: 100%;">
+                                {{ syncStatus.running ? '⏳ 同步中...' : '🔄 开始全量同步' }}
+                            </button>
+                            <small v-if="!simStatus.is_authenticated" style="color: var(--text-muted); display: block; margin-top: 8px;">
+                                ⚠️ 请先在「系统凭证配置」页面完成登录认证
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>数据库统计</h3>
+                        </div>
+                        <div class="status-list" style="margin-top: 15px;">
+                            <div class="status-item">
+                                <span class="status-label">总条目数</span>
+                                <span class="status-val highlight">{{ dbStats.total }}</span>
+                            </div>
+                            <div class="status-item" v-for="(count, typeName) in dbStats.types" :key="typeName">
+                                <span class="status-label">{{ typeName }}</span>
+                                <span class="status-val">{{ count }} 条</span>
+                            </div>
+                            <div v-if="dbStats.total === 0" class="status-item">
+                                <span class="status-label" style="color: var(--text-muted);">数据库为空，请先执行同步</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 日志输出显示面板 -->
+                <div class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <h3>同步说明</h3>
+                    </div>
+                    <div class="status-list" style="margin-top: 10px;">
+                        <p class="status-desc">
+                            📥 数据来源：VIS API <code>api/search/filter.json</code><br>
+                            📊 同步类型：电视剧、电影、综艺、动漫、少儿<br>
+                            🔄 同步方式：全量覆盖（每日建议执行一次）<br>
+                            ⚡ TVBox 接口基于本地 SQLite 数据库，支持 country / year 多条件过滤和评分排序
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 板块三：系统日志 -->
+            <section v-if="activeTab === 'log'" class="tab-pane">
                 <div class="card log-card">
                     <div class="card-header">
                         <div class="header-left">
@@ -180,253 +249,25 @@
                                 <option value="WARNING">警告 (WARN及以上)</option>
                                 <option value="ERROR">错误 (ERROR及以上)</option>
                             </select>
-                            <button class="btn btn-secondary btn-sm" @click="clearLogs">
-                                🗑️ 清空日志
-                            </button>
+                            <button class="btn btn-secondary btn-sm" @click="clearLogs">🗑️ 清空日志</button>
                             <label class="auto-scroll-label">
                                 <input type="checkbox" v-model="logAutoScroll"> 自动滚动
                             </label>
                         </div>
                     </div>
                     <div class="log-container" ref="logContainer">
-                        <div v-if="filteredLogs.length === 0" class="log-empty">
-                            暂无相关运行日志
-                        </div>
-                        <div v-else v-for="(log, idx) in filteredLogs" :key="idx" :class="['log-item', log.level.toLowerCase()]">
+                        <div v-if="filteredLogs.length === 0" class="log-empty">暂无相关运行日志</div>
+                        <div v-else v-for="(log, idx) in filteredLogs" :key="idx" :class="['log-item', log.level]">
                             <span class="log-time">{{ log.time }}</span>
-                            <span :class="['log-level-badge', log.level.toLowerCase()]">{{ log.level }}</span>
+                            <span :class="['log-level-badge', log.level]">{{ log.level }}</span>
                             <span class="log-message">{{ log.message }}</span>
                         </div>
                     </div>
                 </div>
             </section>
-
-            <!-- 板块二：VOD 自定义分类管理 -->
-            <section v-if="activeTab === 'vod'" class="tab-pane">
-                <div class="vod-tabs">
-                    <div class="vod-tabs-scroll">
-                        <div v-for="(cat, idx) in vodCategories" :key="cat.id" :class="['vod-tab-wrapper', { active: activeCategoryId === cat.id }]">
-                            <!-- 内联编辑状态：直接在按钮上显示 input -->
-                            <input
-                                v-if="editingCatId === cat.id"
-                                :id="'cat-rename-input-' + cat.id"
-                                type="text"
-                                v-model="cat.name"
-                                class="cat-rename-input"
-                                @blur="finishRenameCategory(cat)"
-                                @keyup.enter="finishRenameCategory(cat)"
-                                @keyup.esc="finishRenameCategory(cat)"
-                                @click.stop
-                            >
-                            <!-- 普通展示状态 -->
-                            <button v-else class="vod-tab" @click="selectCategory(cat.id)">
-                                📁 {{ cat.name }}
-                            </button>
-                            <span class="tab-action-btn rename-tab" @click.stop="renameCategory(cat)" title="点击修改分类名称">✏️</span>
-                            <span class="tab-action-btn delete-tab" @click.stop="deleteCategory(cat, idx)" title="删除分类">❌</span>
-                        </div>
-                    </div>
-                    <button class="btn-add-tab" @click="addCategory" title="添加顶级分类">➕ 新增分类</button>
-                </div>
-
-                <div class="vod-editor-layout">
-                    <!-- 左栏：可拖拽的原始分类树 -->
-                    <div class="vod-panel source-panel">
-                        <div class="panel-header">
-                            <div class="panel-header-row">
-                                <div>
-                                    <h3>电信 VOD 原始分类目录</h3>
-                                    <p v-if="sourceTreeRefreshing">
-                                        正在从电信服务器抓取… 
-                                        <span class="refresh-progress">{{ sourceTreeMeta.done }}/{{ sourceTreeMeta.total }}</span>
-                                    </p>
-                                    <p v-else-if="sourceTreeMeta.last_updated">
-                                        数据来源：电信 VIS 服务器实时抓取，点击可展开子类
-                                    </p>
-                                    <p v-else>暂无缓存，点击 ↻ 刷新从电信 VIS 服务器拉取实时数据</p>
-                                </div>
-                                <button class="btn-refresh-tree" @click="refreshSourceTree" :disabled="sourceTreeRefreshing" :class="{ spinning: sourceTreeRefreshing }" title="从电信 VIS 服务器重新抓取分类">
-                                    ↻
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="tree-search">
-                            <input type="text" v-model="treeSearchQuery" placeholder="🔍 搜索原始分类名称...">
-                        </div>
-
-                        <div class="tree-container">
-                            <div v-for="root in filteredSourceTree" :key="root.id" class="tree-root-node">
-                                <div class="tree-node-title root-title" @click="toggleNode(root.id)">
-                                    <span class="arrow" :class="{ expanded: isExpanded(root.id) }">▶</span>
-                                    <span>📂 {{ root.name }}</span>
-                                </div>
-                                <div v-show="isExpanded(root.id)" class="tree-level-1-container">
-                                    <div v-for="child in root.children" :key="child.id" class="tree-level-1-node">
-                                        <!-- 一级分类：如果有子集，支持展开；并支持拖拽 -->
-                                        <div class="tree-node-title level-1-title" @click="toggleNode(child.id)">
-                                            <span class="arrow" v-if="child.children.length > 0" :class="{ expanded: isExpanded(child.id) }">▶</span>
-                                            <span class="arrow-placeholder" v-else></span>
-                                            <span>📂 {{ child.name }}</span>
-                                            <span class="tag-id">({{ child.id }})</span>
-                                        </div>
-                                        
-                                        <!-- 一级分类的叶子集合 (提供拖拽克隆) -->
-                                        <div class="draggable-group" :data-id="child.id" :data-name="child.name" v-show="child.children.length === 0 || isExpanded(child.id)">
-                                            <div v-if="child.children.length === 0" class="draggable-item" :data-id="child.id" :data-name="child.name" draggable="true" @dragstart="dragStart($event, child)">
-                                                <span>📄 {{ child.name }}</span>
-                                                <div class="draggable-item-right">
-                                                    <span v-if="child.count > 0" class="count-badge">{{ child.count }}</span>
-                                                    <span class="drag-handle">☰</span>
-                                                </div>
-                                            </div>
-                                            <!-- 二级分类列表 -->
-                                            <div v-else v-for="sub in child.children" :key="sub.id" class="draggable-item" :data-id="sub.id" :data-name="sub.name" draggable="true" @dragstart="dragStart($event, sub)">
-                                                <span>📄 {{ sub.name }}</span>
-                                                <div class="draggable-item-right">
-                                                    <span class="tag-id">({{ sub.id.replace('category_','') }})</span>
-                                                    <span v-if="sub.count > 0" class="count-badge">{{ sub.count }}</span>
-                                                    <span class="drag-handle">☰</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 右栏：自定义平铺分类配置区 -->
-                    <div class="vod-panel dest-panel">
-                        <div class="panel-header">
-                            <h3>平铺展示过滤器列表 (右栏)</h3>
-                            <p>从左边拖入分类加入，上下拖动可重新排序。双击文本可快速改名。</p>
-                        </div>
-                        
-                        <div class="dest-container">
-                            <div class="dest-list-header">
-                                <span>排序与名称</span>
-                                <span>映射分类 ID</span>
-                                <span>操作</span>
-                            </div>
-                            
-                            <div id="dest-sortable-list" class="dest-sortable-list" @dragover.prevent @drop="handleDrop">
-                                <div v-for="(item, idx) in activeFilterList" :key="item.v + idx" class="dest-item" :data-index="idx">
-                                    <div class="dest-item-name">
-                                        <span class="drag-handle">⠿</span>
-                                        <!-- 双击修改名称 -->
-                                        <input v-if="editingIdx === idx" 
-                                               type="text" 
-                                               v-model="item.n" 
-                                               @blur="editingIdx = null" 
-                                               @keyup.enter="editingIdx = null" 
-                                               class="edit-name-input"
-                                               ref="nameInput">
-                                        <span v-else @dblclick="editName(idx)" class="display-name" title="双击可重命名">
-                                            {{ item.n }} ✏️
-                                        </span>
-                                    </div>
-                                    <div class="dest-item-val">
-                                        <span class="category-id-badge">{{ item.v || '全部 (空)' }}</span>
-                                    </div>
-                                    <div class="dest-item-actions">
-                                        <button class="delete-btn" @click="removeFilterItem(idx)" title="从过滤器中删除">❌</button>
-                                    </div>
-                                </div>
-                                <div v-if="activeFilterList.length === 0" class="empty-placeholder">
-                                    📥 拖拽左侧的分类到这里以添加筛选按钮
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="panel-actions">
-                            <button class="btn btn-secondary" @click="resetFilters">🔄 重置为默认</button>
-                            <button class="btn btn-primary" @click="saveFilters" :disabled="savingFilters">
-                                <span class="spinner" v-if="savingFilters"></span>
-                                {{ savingFilters ? '保存中...' : '💾 保存过滤器配置' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 板块三：直播 & EPG 配置 -->
-            <section v-if="activeTab === 'live'" class="tab-pane">
-                <div class="card-grid">
-                    <!-- 直播源设置 -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>直播源与定时更新 (M3U)</h3>
-                            <span class="badge">后期功能</span>
-                        </div>
-                        <div class="status-list" style="margin-top: 15px;">
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" checked disabled> 自动更新直播列表 (Daily Cron)
-                                </label>
-                            </div>
-                            <div class="form-group">
-                                <label>Cron 表达式</label>
-                                <input type="text" value="0 4 * * *" disabled>
-                                <small>每日凌晨 4 点自动更新组播与回看地址</small>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">输出 M3U 订阅口</span>
-                                <span class="status-val select-text">http://localhost:8080/Zhejiang_Telecom_IPTV.m3u</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- EPG 设置 -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>EPG 节目单抓取与缓存</h3>
-                            <span class="badge">后期功能</span>
-                        </div>
-                        <div class="status-list" style="margin-top: 15px;">
-                            <div class="status-item">
-                                <span class="status-label">EPG 数据量缓存</span>
-                                <span class="status-val highlight">共抓取 165 个频道, 缓存 7132 个节目单</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">抓取跨度</span>
-                                <span class="status-val">首次前 7 天 + 今日 + 明日</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">输出 XMLTV 地址</span>
-                                <span class="status-val select-text">http://localhost:8080/epg.xml</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
         </main>
-
-        <!-- 删除确认弹窗 (仅用于删除确认) -->
-        <transition name="fade">
-            <div v-if="modal.show" class="modal-overlay" @click.self="closeModal">
-                <div class="modal-card">
-                    <div class="modal-header">
-                        <h3>{{ modal.title }}</h3>
-                        <button class="close-btn" @click="closeModal">❌</button>
-                    </div>
-                    <div class="modal-body">
-                        <!-- 确认删除警告 -->
-                        <div class="delete-warning">
-                            <p>确定要删除分类 <strong>"{{ modal.targetCat?.name }}"</strong> 吗？</p>
-                            <p class="warning-text">⚠️ 此操作不可撤销，且将同时清除该分类下所有拖拽映射的配置。</p>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" @click="closeModal">取消</button>
-                        <button class="btn btn-danger" @click="submitModal">确认删除</button>
-                    </div>
-                </div>
-            </div>
-        </transition>
     </div>
 
-    <!-- 引入核心 JavaScript 逻辑 -->
-    <script src="js/app.js?v=1.4"></script>
+    <script src="js/app.js?v=2.0"></script>
 </body>
 </html>
