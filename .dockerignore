@@ -20,6 +20,8 @@ sample/
 scratch/
 research_and_debug/
 codebuddy/
+tests/
+tools/
 
 # Docker 自身
 Dockerfile
@@ -27,3 +29,9 @@ Dockerfile
 
 # 文档
 readme.md
+AGENTS.md
+docs/
+
+# 废弃的 Python 文件（新架构不再使用）
+run_simulator.py
+vod-api.py

@@ -1,19 +1,18 @@
+#虚拟环境
+.venv/
+
 # 忽略包含敏感参数的真实配置文件
-config.py
-stb_config.json
-data/stb_config.json
-data/poster_cache.json
-data/vis_sections_cache.json
-data/vod_source_tree_cache.json
-data/vod_categories_default.json
-data/vod_categories.json
+
+#测试脚本
+tests/
+tools/
+data/
 sample/
 research_and_debug/
 scratch/
 codebuddy/
 
-#虚拟环境
-.venv/
+
 
 # 顺便忽略 Python 运行时生成的缓存文件
 __pycache__/

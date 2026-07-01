@@ -25,4 +25,4 @@ COPY . .
 
 EXPOSE 8880
 
-CMD ["python", "vod-api.py"]
+CMD ["python", "main.py"]

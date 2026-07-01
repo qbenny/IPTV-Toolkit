@@ -1,8 +1,0 @@
-{
-  "user_id": "YOUR_USER_ID",
-  "stb_id": "YOUR_STB_ID",
-  "mac_address": "YOUR_MAC_ADDRESS",
-  "ip_address": "YOUR_IP_ADDRESS",
-  "base_url": "http://218.71.130.66:33200",
-  "des_key": "00000000"
-}
