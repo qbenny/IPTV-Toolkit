@@ -97,13 +97,16 @@ def bulk_upsert_items(items: list, type_name: str, sync_time: int) -> int:
 
 
 def _get_order_by(sort: str) -> str:
-    """将 TVBox sort 参数映射为 SQL ORDER BY 子句。"""
+    """将 TVBox sort 参数映射为 SQL ORDER BY 子句。
+    
+    所有排序都追加 contentCode 作为二级排序键，确保同分/同年条目顺序稳定。
+    """
     sort_map = {
-        "score": "score DESC",
-        "time": "year DESC, score DESC",
-        "hits": "score DESC",  # 无热度数据，回退为评分
+        "score": "score DESC, contentCode ASC",
+        "time": "year DESC, score DESC, contentCode ASC",
+        "hits": "score DESC, contentCode ASC",
     }
-    return sort_map.get(sort, "score DESC")
+    return sort_map.get(sort, "score DESC, contentCode ASC")
 
 
 def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "score") -> dict:
@@ -147,11 +150,17 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
     result_list = []
     for row in rows:
         item_type = "vod" if row["contentBaseType"] == "001" else "series"
+        # 组合 remarks：类型 + 年份 + 评分，便于区分同名内容
+        remarks_parts = [row["type"] or ""]
+        if row["year"]:
+            remarks_parts.append(str(row["year"]))
+        if row["score"]:
+            remarks_parts.append(str(row["score"]) + "分")
         result_list.append({
             "vod_id": f"{item_type}_{row['contentCode']}",
             "vod_name": row["title"],
             "vod_pic": row["icon"] or row["poster"] or "",
-            "vod_remarks": row["type"] or "",
+            "vod_remarks": " | ".join(remarks_parts),
         })
 
     pagecount = max(1, (total + page_size - 1) // page_size)
@@ -233,11 +242,17 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
     result_list = []
     for row in rows:
         item_type = "vod" if row["contentBaseType"] == "001" else "series"
+        # 组合 remarks：类型 + 年份 + 评分，便于区分同名内容
+        remarks_parts = [row["type"] or ""]
+        if row["year"]:
+            remarks_parts.append(str(row["year"]))
+        if row["score"]:
+            remarks_parts.append(str(row["score"]) + "分")
         result_list.append({
             "vod_id": f"{item_type}_{row['contentCode']}",
             "vod_name": row["title"],
             "vod_pic": row["icon"] or row["poster"] or "",
-            "vod_remarks": row["type"] or "",
+            "vod_remarks": " | ".join(remarks_parts),
         })
 
     pagecount = max(1, (total + page_size - 1) // page_size)
@@ -267,6 +282,23 @@ def get_item_by_code(content_code: str) -> Optional[dict]:
     if row:
         return dict(row)
     return None
+
+
+def has_title_duplicate(title: str) -> bool:
+    """检查数据库中是否存在与给定标题重名的其他记录。
+
+    Args:
+        title: 要检查的标题
+
+    Returns:
+        True if count > 1 (存在重名)
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM vod_items WHERE title = ?", (title,))
+    count = c.fetchone()[0]
+    conn.close()
+    return count > 1
 
 
 def get_stats() -> dict:
