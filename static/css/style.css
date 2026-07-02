@@ -1549,3 +1549,285 @@ body {
     opacity: 0;
     transform: translateY(-8px);
 }
+
+/* ==========================================
+ * 6. Live Channel Management Styles
+ * ========================================== */
+
+/* Toolbar & Filter Bar */
+.live-stats-badge {
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--bg-sidebar);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.live-select {
+    background: var(--bg-sidebar);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: var(--font-primary);
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--transition-speed) var(--transition-ease);
+}
+.live-select:focus { border-color: var(--color-primary); }
+
+.live-search-input {
+    background: var(--bg-sidebar);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: var(--font-primary);
+    outline: none;
+}
+.live-search-input:focus { border-color: var(--color-primary); }
+
+/* Channel Table */
+.live-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.live-table th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+.live-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+.live-table tbody tr:hover {
+    background: rgba(var(--color-primary-rgb), 0.06);
+}
+.live-table tbody tr.row-disabled {
+    opacity: 0.45;
+}
+.live-table tbody tr.row-disabled td {
+    color: var(--text-muted);
+}
+
+.cell-name {
+    font-weight: 500;
+}
+.cell-url {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.channel-name-text {
+    margin-right: 6px;
+}
+
+/* Badges */
+.badge-hd {
+    display: inline-block;
+    font-size: 10px;
+    background: var(--color-primary);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    font-weight: 500;
+}
+.badge-ts {
+    display: inline-block;
+    font-size: 10px;
+    background: var(--color-success);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    font-weight: 500;
+}
+
+/* Drag Handle */
+.drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 18px;
+    user-select: none;
+    padding: 4px;
+}
+.drag-handle:active { cursor: grabbing; }
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 20px;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    transition: background var(--transition-speed) var(--transition-ease);
+}
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    left: 3px; bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition-speed) var(--transition-ease);
+}
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--color-primary);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+}
+
+/* Import Area */
+.import-textarea {
+    width: 100%;
+    background: var(--bg-sidebar);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+}
+.import-textarea:focus { border-color: var(--color-primary); }
+
+.import-file-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--transition-speed);
+    color: var(--text-muted);
+}
+.import-file-zone:hover {
+    border-color: var(--color-primary);
+}
+.import-file-zone input[type="file"] {
+    display: block;
+    width: 100%;
+    cursor: pointer;
+}
+
+.import-tab-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-sidebar);
+    color: var(--text-main);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all var(--transition-speed);
+}
+.import-tab-btn.active {
+    border-color: var(--color-primary);
+    background: rgba(var(--color-primary-rgb), 0.15);
+    color: var(--color-primary);
+}
+
+.import-preview-list {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.import-preview-list .card-header {
+    padding: 10px 14px;
+}
+
+/* Modal Close Button */
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    line-height: 1;
+}
+.modal-close-btn:hover {
+    background: var(--border-color);
+    color: var(--text-main);
+}
+
+/* Full-width form group in modal */
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Sortable ghost */
+.sortable-ghost {
+    opacity: 0.3;
+    background: rgba(var(--color-primary-rgb), 0.1) !important;
+}
+.sortable-chosen {
+    background: rgba(var(--color-primary-rgb), 0.15) !important;
+}
+
+/* Table wrapper */
+.table-wrapper {
+    border-radius: 0 0 12px 12px;
+}
+
+/* Multi-select checkbox in table */
+.chk-row {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+/* Channel logo in table */
+.channel-logo-img {
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+}
+
+/* Unicast proxy link */
+.unicast-proxy-link {
+    color: var(--color-success);
+}
+
+/* Import URL zone */
+.import-url-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Selected row highlight */
+.live-table tbody tr.row-selected {
+    background: rgba(var(--color-primary-rgb), 0.12);
+}

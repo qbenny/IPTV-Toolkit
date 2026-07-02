@@ -402,3 +402,143 @@ class STBSimulator:
         except Exception as e:
             self.logger.error("获取电视剧剧集信息失败: %s", e)
             return None
+
+    @staticmethod
+    def _parse_channel_block(block: str) -> dict:
+        """解析单个 CTCSetConfig('Channel', '...') 块的完整字段。
+
+        Args:
+            block: key="value",... 格式的原始字符串
+
+        Returns:
+            包含所有解析字段的字典
+        """
+        import json as _json
+
+        kv_pairs = re.findall(r'(\w+)="([^"]*)"', block)
+        ch_info = {k: v for k, v in kv_pairs}
+
+        if "ChannelName" not in ch_info or "ChannelURL" not in ch_info:
+            return {}
+
+        # 原始值保存为 JSON
+        raw_fields_json = _json.dumps(ch_info, ensure_ascii=False)
+
+        # 解析 ChannelURL: igmp://...|rtsp://... 或 http://...
+        play_url_raw = ch_info.get("ChannelURL", "")
+        urls = play_url_raw.split("|")
+        multicast_url = ""
+        unicast_url_full = ""
+        for u in urls:
+            if u.startswith("igmp://"):
+                multicast_url = u
+            elif u.startswith("rtsp://") or u.startswith("http://"):
+                unicast_url_full = u
+
+        # 简化版单播 URL（去动态 token 参数，长期有效）
+        unicast_url = unicast_url_full.split("?")[0] if unicast_url_full else ""
+
+        def _int(key: str, default: int = 0) -> int:
+            try:
+                return int(ch_info.get(key, str(default)))
+            except (ValueError, TypeError):
+                return default
+
+        return {
+            "channel_id": ch_info.get("ChannelID", ""),
+            "user_channel_id": ch_info.get("UserChannelID", ""),
+            "name": ch_info.get("ChannelName", ""),
+            "multicast_url": multicast_url,
+            "unicast_url": unicast_url,
+            "unicast_url_full": unicast_url_full,
+            "timeshift_enabled": _int("TimeShift"),
+            "timeshift_length": _int("TimeShiftLength"),
+            "timeshift_url": ch_info.get("TimeShiftURL", ""),
+            "is_hd": _int("IsHDChannel"),
+            "channel_type": ch_info.get("ChannelType", ""),
+            "channel_sdp": ch_info.get("ChannelSDP", ""),
+            "channel_url_raw": play_url_raw,
+            "channel_locked": _int("ChannelLocked"),
+            "preview_enabled": _int("PreviewEnable"),
+            "fcc_enabled": _int("FCCEnable"),
+            "fcc_ip": ch_info.get("ChannelFCCIP", ""),
+            "fcc_port": ch_info.get("ChannelFCCPort", ""),
+            "fec_port": _int("ChannelFECPort"),
+            "raw_fields_json": raw_fields_json,
+        }
+
+    @staticmethod
+    def parse_channel_response(raw_text: str) -> list:
+        """解析包含 CTCSetConfig 调用的原始响应文本为频道列表。
+
+        可用于测试环境，传入样本 HTML/JS 直接解析频道数据。
+
+        Args:
+            raw_text: 包含 Authentication.CTCSetConfig('Channel',...) 的原始文本
+
+        Returns:
+            解析后的频道字典列表
+        """
+        channel_blocks = re.findall(
+            r"Authentication\.CTCSetConfig\(\s*['\"]Channel['\"]\s*,\s*['\"](.+?)['\"]\s*\)",
+            raw_text,
+        )
+        channels = []
+        for block in channel_blocks:
+            parsed = STBSimulator._parse_channel_block(block)
+            if parsed:
+                channels.append(parsed)
+        return channels
+
+    def get_channel_list(self) -> list:
+        """获取机顶盒的直播频道列表（全字段版）。
+
+        向 /EPG/jsp/getchannellistHWCTC.jsp 发送 POST 请求，
+        拉取服务器返回的频道信息并解析所有字段。
+
+        Returns:
+            频道字典列表，每个字典包含 21 个字段
+        """
+        if not self.state.is_authenticated:
+            self.logger.error("未认证，无法获取频道列表。")
+            return []
+
+        self.logger.info("========== 开始拉取频道列表 ==========")
+        stbid_sub = self.config.stb_id[6:12] if len(self.config.stb_id) >= 12 else "990060"
+
+        payload = {
+            "conntype": "4",
+            "UserToken": self.state.user_token,
+            "tempKey": "92FFB4697440F8091240BEEDBD935E9E",
+            "stbid": stbid_sub,
+            "SupportHD": "1",
+            "UserID": self.config.user_id,
+            "Lang": "1",
+        }
+
+        url = f"{self.state.epg_base_url}/EPG/jsp/getchannellistHWCTC.jsp"
+        try:
+            res = self.state.session.post(
+                url,
+                data=payload,
+                headers={
+                    **self.config.headers,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Referer": f"{self.state.epg_base_url}/EPG/jsp/ValidAuthenticationHWCTC.jsp",
+                },
+                timeout=15,
+            )
+            self._log_request("POST", url, res)
+
+            if res.status_code != 200:
+                self.logger.error("频道列表请求失败，HTTP 状态码: %d", res.status_code)
+                return []
+
+            channels = self.parse_channel_response(res.text)
+
+            self.logger.info("成功拉取并解析出 %d 个频道！", len(channels))
+            return channels
+
+        except Exception as e:
+            self.logger.error("获取频道列表时遭遇异常: %s", e, exc_info=True)
+            return []

@@ -16,6 +16,7 @@ import uvicorn
 from src.utils.logger import setup_logger, LOG_FILE, logger
 from src.utils.helpers import get_lan_ip
 from src.db.models import init_db
+from src.db.live_crud import init_live_defaults
 from src.auth.config import STBDeviceConfig
 from src.auth.simulator import STBSimulator
 from src.auth.heartbeat import start_heartbeat_thread
@@ -49,6 +50,7 @@ def load_stb_config() -> dict:
 
 setup_logger("IPTV-Toolkit")
 init_db()
+init_live_defaults()
 
 config_data = load_stb_config()
 config_stb = STBDeviceConfig(
@@ -101,10 +103,12 @@ def _start_heartbeat():
 
 from src.api.tvbox import set_simulator as set_sim_tvbox
 from src.api.play import set_simulator as set_sim_play
+from src.api.live import set_simulator as set_sim_live
 from src.web.routes import set_simulator as set_sim_web, set_login_func
 
 set_sim_tvbox(sim)
 set_sim_play(sim)
+set_sim_live(sim)
 set_sim_web(sim)
 set_login_func(login_sim)
 
@@ -127,6 +131,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # 注册 Web 路由
 from src.web.routes import router as web_router
 app.include_router(web_router)
+
+# 注册直播频道路由
+from src.api.live import router as live_router
+app.include_router(live_router)
 
 # TVBox 配置接口
 from src.api.tvbox import get_tvbox_config
