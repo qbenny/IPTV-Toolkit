@@ -390,6 +390,16 @@ const app = createApp({
             } catch (e) { /* silent */ }
         },
 
+        getLogoUrl(logo) {
+            if (!logo) return '';
+            if (logo.startsWith('http://') || logo.startsWith('https://')) {
+                return logo;
+            }
+            const base = this.liveConfig.logo_base_url || '/static/logo/';
+            const cleanBase = base.endsWith('/') ? base : base + '/';
+            return cleanBase + logo;
+        },
+
         async triggerLiveSync() {
             this.syncingLive = true;
             try {
@@ -758,34 +768,85 @@ const app = createApp({
                 this.sortableInstance = window.Sortable.create(el, {
                     handle: '.drag-handle',
                     animation: 150,
-                    onEnd: async (evt) => {
-                        const rows = el.querySelectorAll('.live-channel-row');
-                        const order = [];
-                        rows.forEach((row, index) => {
-                            const id = parseInt(row.getAttribute('data-id'));
-                            order.push({ id, sort_index: (this.liveFilter.page - 1) * this.liveFilter.limit + index });
-                        });
-                        
-                        order.forEach(item => {
-                            const ch = this.liveChannels.find(c => c.id === item.id);
-                            if (ch) ch.sort_index = item.sort_index;
-                        });
-                        
-                        try {
-                            const r = await fetch('/api/live/channels/reorder', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ order })
-                            });
-                            if (r.ok) {
-                                this.showToast('排序更新成功');
-                                this.fetchLiveStats();
-                            } else {
-                                this.showToast('保存排序失败', 'error');
+                    onStart: (evt) => {
+                        const draggedId = parseInt(evt.item.getAttribute('data-id'));
+                        if (this.selectedChannelIds.includes(draggedId)) {
+                            const nameValEl = evt.item.querySelector('.channel-name-val');
+                            if (nameValEl) {
+                                this.draggedOrigText = nameValEl.textContent;
+                                nameValEl.textContent = `📦 正在拖拽 ${this.selectedChannelIds.length} 个已选频道...`;
                             }
-                        } catch(e) {
-                            this.showToast('排序请求失败', 'error');
+                            this.selectedChannelIds.forEach(id => {
+                                if (id !== draggedId) {
+                                    const rowEl = el.querySelector(`.live-channel-row[data-id="${id}"]`);
+                                    if (rowEl) {
+                                        rowEl.classList.add('sortable-batch-ghost');
+                                    }
+                                }
+                            });
                         }
+                    },
+                    onEnd: async (evt) => {
+                        const draggedId = parseInt(evt.item.getAttribute('data-id'));
+                        const isBatch = this.selectedChannelIds.includes(draggedId);
+                        
+                        // Clean up visual changes
+                        const ghostRows = el.querySelectorAll('.sortable-batch-ghost');
+                        ghostRows.forEach(row => row.classList.remove('sortable-batch-ghost'));
+                        
+                        if (isBatch && this.draggedOrigText) {
+                            const nameValEl = evt.item.querySelector('.channel-name-val');
+                            if (nameValEl) {
+                                nameValEl.textContent = this.draggedOrigText;
+                            }
+                        }
+                        
+                        const dragIds = isBatch ? [...this.selectedChannelIds] : [draggedId];
+                        
+                        // Find where it was dropped relative to neighboring DOM elements
+                        const nextEl = evt.item.nextElementSibling;
+                        let targetSiblingId = null;
+                        if (nextEl) {
+                            targetSiblingId = parseInt(nextEl.getAttribute('data-id'));
+                        }
+                        
+                        const draggedItems = this.liveChannels.filter(c => dragIds.includes(c.id));
+                        const remainingItems = this.liveChannels.filter(c => !dragIds.includes(c.id));
+                        
+                        let insertIdx = remainingItems.length;
+                        if (targetSiblingId !== null) {
+                            const idx = remainingItems.findIndex(c => c.id === targetSiblingId);
+                            if (idx !== -1) insertIdx = idx;
+                        }
+                        
+                        remainingItems.splice(insertIdx, 0, ...draggedItems);
+                        
+                        const order = remainingItems.map((item, index) => {
+                            const newSort = (this.liveFilter.page - 1) * this.liveFilter.limit + index;
+                            return { id: item.id, sort_index: newSort };
+                        });
+                        
+                        this.liveChannels = remainingItems;
+                        this.tbodyKey++;
+                        
+                        this.$nextTick(async () => {
+                            this.initSortable();
+                            try {
+                                const r = await fetch('/api/live/channels/reorder', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ order })
+                                });
+                                if (r.ok) {
+                                    this.showToast(isBatch ? `批量排序成功 (${dragIds.length} 个频道)` : '排序更新成功');
+                                    this.fetchLiveStats();
+                                } else {
+                                    this.showToast('保存排序失败', 'error');
+                                }
+                            } catch(e) {
+                                this.showToast('排序请求失败', 'error');
+                            }
+                        });
                     }
                 });
             }

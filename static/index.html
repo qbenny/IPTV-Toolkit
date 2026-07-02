@@ -390,16 +390,18 @@
                                         </th>
                                         <th style="width: 60px; text-align: center;">启用</th>
                                         <th style="width: 50px; text-align: center;">排序</th>
-                                        <th>频道名称</th>
                                         <th style="width: 140px;">序号 / ID</th>
-                                        <th style="width: 130px;">所属分类</th>
-                                        <th>播放地址</th>
+                                        <th style="width: 60px; text-align: center;">台标</th>
+                                        <th style="width: 180px;">频道名称</th>
+                                        <th style="width: 120px;">所属分类</th>
+                                        <th>组播地址</th>
+                                        <th>单播地址</th>
                                         <th style="width: 130px; text-align: center;">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="live-channel-list-tbody" :key="tbodyKey">
                                     <tr v-if="liveChannels.length === 0">
-                                        <td colspan="8" class="empty-row" style="text-align: center; padding: 30px; color: var(--text-muted);">暂无满足条件的频道数据，请尝试同步或手动导入</td>
+                                        <td colspan="10" class="empty-row" style="text-align: center; padding: 30px; color: var(--text-muted);">暂无满足条件的频道数据，请尝试同步或手动导入</td>
                                     </tr>
                                     <tr v-for="ch in liveChannels" :key="ch.id" :data-id="ch.id" class="live-channel-row">
                                         <td style="text-align: center;">
@@ -415,21 +417,28 @@
                                             <span style="cursor: move; color: var(--text-muted); font-size: 16px;">☰</span>
                                         </td>
                                         <td>
+                                            <span class="text-secondary" style="font-weight: 600;" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span>
+                                            <span class="text-muted" style="font-size: 11px; margin-left: 8px;" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span>
+                                        </td>
+                                        <td style="text-align: center; padding: 4px;">
+                                            <img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.05); padding: 2px; border: 1px solid var(--border-color);" @error="ch.logo_failed = true">
+                                            <span v-else style="color: var(--text-muted); font-size: 14px;">📺</span>
+                                        </td>
+                                        <td>
                                             <span class="channel-name-val" style="font-weight: 500;">{{ ch.name }}</span>
                                             <span v-if="ch.source === 'external'" class="badge" style="background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); margin-left: 6px; padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid rgba(var(--color-primary-rgb), 0.2);">外部</span>
                                             <span v-if="ch.timeshift_enabled === 1" class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; margin-left: 6px; padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.2);" title="支持时移回看">时移</span>
-                                        </td>
-                                        <td>
-                                            <span class="text-secondary" style="font-weight: 600;" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span>
-                                            <span class="text-muted" style="font-size: 11px; margin-left: 8px;" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span>
                                         </td>
                                         <td>
                                             <span class="cat-tag" :style="{ borderLeft: '4px solid ' + (ch.category_color || 'var(--color-primary)') }">
                                                 {{ ch.category_name || '未分类' }}
                                             </span>
                                         </td>
-                                        <td class="url-cell" :title="ch.multicast_url || ch.unicast_url">
-                                            <code class="url-text">{{ ch.multicast_url || ch.unicast_url || '—' }}</code>
+                                        <td class="url-cell" :title="ch.multicast_url">
+                                            <code class="url-text">{{ ch.multicast_url || '—' }}</code>
+                                        </td>
+                                        <td class="url-cell" :title="ch.unicast_url">
+                                            <code class="url-text">{{ ch.unicast_url || '—' }}</code>
                                         </td>
                                         <td style="text-align: center;">
                                             <div class="row-actions justify-center">

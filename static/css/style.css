@@ -2236,5 +2236,12 @@ body {
     gap: 4px;
 }
 
+.sortable-batch-ghost {
+    opacity: 0.35 !important;
+    background: rgba(var(--color-primary-rgb), 0.15) !important;
+    border: 1px dashed var(--color-primary) !important;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
 
 
