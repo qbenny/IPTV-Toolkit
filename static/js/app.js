@@ -19,11 +19,13 @@ const app = createApp({
             tabTitles: {
                 stb: '系统凭证配置',
                 sync: '数据同步管理',
+                live: '直播频道管理',
                 log: '系统日志'
             },
             tabSubtitles: {
                 stb: '配置电信机顶盒仿真认证参数，保障安全接入 EPG 网关',
                 sync: '从 VIS API 同步点播数据到本地 SQLite 数据库',
+                live: '管理直播频道、分类、外部导入，生成 M3U 订阅',
                 log: '查看系统运行日志，支持级别过滤'
             },
 
@@ -44,6 +46,34 @@ const app = createApp({
             },
             dbStats: { total: 0, types: {}, last_synced: 0 },
             syncStatusTimer: null,
+
+            // Plate 4: Live Channel Management
+            liveFilter: {
+                category_id: null, enabled: null, source: null, keyword: '', page: 1, limit: 10000
+            },
+            liveChannels: [],
+            liveTotal: 0,
+            liveCategories: [],
+            liveConfig: {
+                udpxy_address: '', epg_url: '', logo_base_url: '',
+                fcc_global_enabled_bool: false, timeshift_enabled_bool: false, m3u_dual_line_bool: false
+            },
+            newCategory: { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 },
+            editingCh: null,
+            showLiveConfigModal: false,
+            showCategoryModal: false,
+            showEditChannelModal: false,
+            syncingLive: false,
+            importFormat: 'm3u',
+            importMethod: 'text',
+            importText: '',
+            importFile: null,
+            importingChannels: false,
+            liveStats: { server: 0, external: 0, enabled: 0, disabled: 0 },
+            sortableInstance: null,
+            selectedChannelIds: [],
+            selectAllChannels: false,
+            tbodyKey: 0,
 
             // Plate 3: Log
             logs: [],
@@ -66,6 +96,10 @@ const app = createApp({
         vodApiLinks() {
             const origin = window.location.origin;
             return { tvbox: `${origin}/zjvod`, api: `${origin}/api/vod` };
+        },
+        liveM3uUrl() {
+            const origin = window.location.origin;
+            return `${origin}/api/live/tv.m3u`;
         }
     },
 
@@ -78,6 +112,17 @@ const app = createApp({
                 this.startLogPolling();
             } else if (newTab === 'sync') {
                 this.startSyncStatusPolling();
+            } else if (newTab === 'live') {
+                this.initLiveTab();
+            }
+        },
+        selectedChannelIds(newVal) {
+            if (newVal.length === 0) {
+                this.selectAllChannels = false;
+            } else if (this.liveChannels.length > 0 && newVal.length === this.liveChannels.length) {
+                this.selectAllChannels = true;
+            } else {
+                this.selectAllChannels = false;
             }
         }
     },
@@ -86,7 +131,11 @@ const app = createApp({
         this.initTheme();
         this.fetchStbConfig();
         this.fetchDbStats();
-        if (this.activeTab === 'stb') this.startSimStatusPolling();
+        if (this.activeTab === 'stb') {
+            this.startSimStatusPolling();
+        } else if (this.activeTab === 'live') {
+            this.initLiveTab();
+        }
     },
 
     beforeUnmount() {
@@ -277,6 +326,469 @@ const app = createApp({
         startLogPolling() {
             this.fetchLogs();
             if (!this.logPollTimer) this.logPollTimer = setInterval(() => this.fetchLogs(), 2000);
+        },
+
+        // ---- Live Channel Management ----
+        initLiveTab() {
+            this.fetchLiveCategories();
+            this.fetchLiveConfig();
+            this.fetchLiveChannels(1);
+            this.fetchLiveStats();
+        },
+
+        async fetchLiveChannels(page = 1) {
+            this.liveFilter.page = page;
+            try {
+                const params = new URLSearchParams();
+                if (this.liveFilter.category_id !== null) params.append('category_id', this.liveFilter.category_id);
+                if (this.liveFilter.enabled !== null) params.append('enabled', this.liveFilter.enabled);
+                if (this.liveFilter.source !== null) params.append('source', this.liveFilter.source);
+                if (this.liveFilter.keyword) params.append('keyword', this.liveFilter.keyword);
+                params.append('page', this.liveFilter.page);
+                params.append('limit', this.liveFilter.limit);
+
+                const r = await fetch(`/api/live/channels?${params.toString()}`);
+                const data = await r.json();
+                this.liveChannels = data.channels;
+                this.liveTotal = data.total;
+                this.tbodyKey++;
+                this.selectedChannelIds = [];
+                this.selectAllChannels = false;
+                
+                this.$nextTick(() => {
+                    this.initSortable();
+                });
+            } catch (e) {
+                this.showToast('加载直播频道失败', 'error');
+            }
+        },
+
+        async fetchLiveCategories() {
+            try {
+                const r = await fetch('/api/live/categories');
+                this.liveCategories = await r.json();
+            } catch (e) { /* silent */ }
+        },
+
+        async fetchLiveConfig() {
+            try {
+                const r = await fetch('/api/live/config');
+                const config = await r.json();
+                this.liveConfig = {
+                    ...config,
+                    fcc_global_enabled_bool: config.fcc_global_enabled === '1',
+                    timeshift_enabled_bool: config.timeshift_enabled === '1',
+                    m3u_dual_line_bool: config.m3u_dual_line === '1'
+                };
+            } catch (e) { /* silent */ }
+        },
+
+        async fetchLiveStats() {
+            try {
+                const r = await fetch('/api/live/stats');
+                this.liveStats = await r.json();
+            } catch (e) { /* silent */ }
+        },
+
+        async triggerLiveSync() {
+            this.syncingLive = true;
+            try {
+                const r = await fetch('/api/live/sync', { method: 'POST' });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(res.message);
+                    this.initLiveTab();
+                } else {
+                    this.showToast(res.message || '同步失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络请求异常', 'error');
+            } finally {
+                this.syncingLive = false;
+            }
+        },
+
+        async toggleChannelEnabled(ch) {
+            const next_enabled = ch.is_enabled === 1 ? 0 : 1;
+            try {
+                const r = await fetch(`/api/live/channels/${ch.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...ch,
+                        is_enabled: next_enabled
+                    })
+                });
+                if (r.ok) {
+                    ch.is_enabled = next_enabled;
+                    this.showToast(ch.is_enabled ? '频道已启用' : '频道已禁用');
+                    this.fetchLiveStats();
+                } else {
+                    this.showToast('操作失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        editChannel(ch) {
+            this.editingCh = { ...ch };
+            this.showEditChannelModal = true;
+        },
+
+        async saveChannelEdit() {
+            if (!this.editingCh) return;
+            try {
+                const r = await fetch(`/api/live/channels/${this.editingCh.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.editingCh)
+                });
+                if (r.ok) {
+                    this.showToast('频道修改成功');
+                    this.showEditChannelModal = false;
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.detail || '修改失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        async deleteChannel(id) {
+            if (!confirm('确定要删除这个外部频道吗？')) return;
+            try {
+                const r = await fetch(`/api/live/channels/${id}`, { method: 'DELETE' });
+                if (r.ok) {
+                    this.showToast('频道删除成功');
+                    this.fetchLiveChannels(this.liveFilter.page);
+                    this.fetchLiveStats();
+                } else {
+                    this.showToast('删除失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        openLiveConfigModal() {
+            this.showLiveConfigModal = true;
+        },
+
+        async saveLiveConfig() {
+            const payload = {
+                ...this.liveConfig,
+                fcc_global_enabled: this.liveConfig.fcc_global_enabled_bool ? '1' : '0',
+                timeshift_enabled: this.liveConfig.timeshift_enabled_bool ? '1' : '0',
+                m3u_dual_line: this.liveConfig.m3u_dual_line_bool ? '1' : '0'
+            };
+            delete payload.fcc_global_enabled_bool;
+            delete payload.timeshift_enabled_bool;
+            delete payload.m3u_dual_line_bool;
+
+            try {
+                const r = await fetch('/api/live/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (r.ok) {
+                    this.showToast('直播配置保存成功');
+                    this.showLiveConfigModal = false;
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    this.showToast('配置保存失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        openCategoryModal() {
+            this.showCategoryModal = true;
+            this.newCategory = { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 };
+        },
+
+        async addLiveCategory() {
+            if (!this.newCategory.name.trim()) {
+                this.showToast('请输入分类名称', 'error');
+                return;
+            }
+            try {
+                const r = await fetch('/api/live/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.newCategory)
+                });
+                if (r.ok) {
+                    this.showToast('分类添加成功');
+                    this.fetchLiveCategories();
+                    this.newCategory = { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 };
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.detail || '添加失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        async updateLiveCategory(cat) {
+            try {
+                const r = await fetch(`/api/live/categories/${cat.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cat)
+                });
+                if (r.ok) {
+                    this.showToast('分类修改成功');
+                    this.fetchLiveCategories();
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.detail || '修改失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        async deleteLiveCategory(id) {
+            if (!confirm('确定要删除此分类吗？关联的频道将自动归入“未分类”。')) return;
+            try {
+                const r = await fetch(`/api/live/categories/${id}`, { method: 'DELETE' });
+                if (r.ok) {
+                    this.showToast('分类删除成功');
+                    this.fetchLiveCategories();
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    this.showToast('删除失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        handleImportFileSelect(e) {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                this.importFile = files[0];
+            }
+        },
+
+        handleImportFileDrop(e) {
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                this.importFile = files[0];
+                const ext = this.importFile.name.toLowerCase().split('.').pop();
+                if (ext === 'csv') {
+                    this.importFormat = 'csv';
+                } else if (ext === 'm3u' || ext === 'm3u8') {
+                    this.importFormat = 'm3u';
+                }
+            }
+        },
+
+        async importExternalChannels() {
+            this.importingChannels = true;
+            try {
+                if (this.importMethod === 'file') {
+                    if (!this.importFile) {
+                        this.showToast('请先选择要上传的文件', 'error');
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('file', this.importFile);
+                    const r = await fetch(`/api/live/import?format=${this.importFormat}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const res = await r.json();
+                    if (r.ok) {
+                        this.showToast(`导入成功！新增 ${res.new} 个，跳过 ${res.skipped} 个，总共 ${res.total} 个`);
+                        this.importFile = null;
+                        this.initLiveTab();
+                    } else {
+                        const data = await r.json();
+                        this.showToast(data.detail || '导入失败', 'error');
+                    }
+                } else {
+                    if (!this.importText.trim()) {
+                        this.showToast('请粘贴文本内容再进行导入', 'error');
+                        return;
+                    }
+                    const r = await fetch(`/api/live/import?format=${this.importFormat}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            format: this.importFormat,
+                            content: this.importText
+                        })
+                    });
+                    const res = await r.json();
+                    if (r.ok) {
+                        this.showToast(`导入成功！新增 ${res.new} 个，跳过 ${res.skipped} 个，总共 ${res.total} 个`);
+                        this.importText = '';
+                        this.initLiveTab();
+                    } else {
+                        const data = await r.json();
+                        this.showToast(data.detail || '导入失败', 'error');
+                    }
+                }
+            } catch (e) {
+                this.showToast('导入过程中遭遇异常', 'error');
+            } finally {
+                this.importingChannels = false;
+            }
+        },
+
+        changeLivePage(page) {
+            this.fetchLiveChannels(page);
+        },
+
+        toggleSelectAll() {
+            if (this.selectAllChannels) {
+                this.selectedChannelIds = this.liveChannels.map(c => c.id);
+            } else {
+                this.selectedChannelIds = [];
+            }
+        },
+
+        async batchSetEnabled(enabled) {
+            if (this.selectedChannelIds.length === 0) return;
+            try {
+                const r = await fetch('/api/live/channels/batch-enabled', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ids: this.selectedChannelIds,
+                        enabled: enabled
+                    })
+                });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(res.message);
+                    this.selectedChannelIds = [];
+                    this.fetchLiveChannels(this.liveFilter.page);
+                    this.fetchLiveStats();
+                } else {
+                    this.showToast(res.detail || '批量设置状态失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络请求异常', 'error');
+            }
+        },
+
+        async batchChangeCategory(event) {
+            const catId = parseInt(event.target.value);
+            if (isNaN(catId) || this.selectedChannelIds.length === 0) return;
+            try {
+                const r = await fetch('/api/live/channels/batch-category', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ids: this.selectedChannelIds,
+                        category_id: catId
+                    })
+                });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(res.message);
+                    this.selectedChannelIds = [];
+                    event.target.value = '';
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    this.showToast(res.detail || '批量修改分类失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络请求异常', 'error');
+            }
+        },
+
+        async batchDelete() {
+            if (this.selectedChannelIds.length === 0) return;
+            if (!confirm(`确定要删除选中的 ${this.selectedChannelIds.length} 个频道吗？`)) return;
+            try {
+                const r = await fetch('/api/live/channels/batch-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ids: this.selectedChannelIds
+                    })
+                });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(res.message);
+                    this.selectedChannelIds = [];
+                    this.fetchLiveChannels(this.liveFilter.page);
+                    this.fetchLiveStats();
+                } else {
+                    this.showToast(res.detail || '批量删除失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络请求异常', 'error');
+            }
+        },
+
+        async resetLiveChannelsOrder() {
+            if (!confirm('确定要恢复默认排序吗？这会清除拖拽自定义顺序，并按系统序号/ID恢复初始顺序。')) return;
+            try {
+                const r = await fetch('/api/live/channels/reset-order', { method: 'POST' });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(res.message);
+                    this.fetchLiveChannels(1);
+                } else {
+                    this.showToast('重置排序失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络连接异常', 'error');
+            }
+        },
+
+        initSortable() {
+            const el = document.getElementById('live-channel-list-tbody');
+            if (!el) return;
+            if (this.sortableInstance) {
+                this.sortableInstance.destroy();
+            }
+            if (window.Sortable) {
+                this.sortableInstance = window.Sortable.create(el, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    onEnd: async (evt) => {
+                        const rows = el.querySelectorAll('.live-channel-row');
+                        const order = [];
+                        rows.forEach((row, index) => {
+                            const id = parseInt(row.getAttribute('data-id'));
+                            order.push({ id, sort_index: (this.liveFilter.page - 1) * this.liveFilter.limit + index });
+                        });
+                        
+                        order.forEach(item => {
+                            const ch = this.liveChannels.find(c => c.id === item.id);
+                            if (ch) ch.sort_index = item.sort_index;
+                        });
+                        
+                        try {
+                            const r = await fetch('/api/live/channels/reorder', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ order })
+                            });
+                            if (r.ok) {
+                                this.showToast('排序更新成功');
+                                this.fetchLiveStats();
+                            } else {
+                                this.showToast('保存排序失败', 'error');
+                            }
+                        } catch(e) {
+                            this.showToast('排序请求失败', 'error');
+                        }
+                    }
+                });
+            }
         }
     }
 });

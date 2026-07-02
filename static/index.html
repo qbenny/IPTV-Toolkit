@@ -24,6 +24,9 @@
                 <a href="#" :class="['nav-item', { active: activeTab === 'sync' }]" @click.prevent="activeTab = 'sync'">
                     <span class="nav-icon">🔄</span> 数据同步管理
                 </a>
+                <a href="#" :class="['nav-item', { active: activeTab === 'live' }]" @click.prevent="activeTab = 'live'">
+                    <span class="nav-icon">📺</span> 直播频道管理
+                </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'log' }]" @click.prevent="activeTab = 'log'">
                     <span class="nav-icon">📋</span> 系统日志
                 </a>
@@ -44,8 +47,8 @@
                     <h1>{{ tabTitles[activeTab] }}</h1>
                     <p class="header-subtitle">{{ tabSubtitles[activeTab] }}</p>
                 </div>
-                <transition name="fade-slide">
-                    <div v-if="activeTab === 'sync'" class="api-links-panel">
+                <transition name="fade-slide" mode="out-in">
+                    <div v-if="activeTab === 'sync'" class="api-links-panel" key="sync">
                         <div class="api-link-item">
                             <span class="api-link-label">📦 TVBox 订阅</span>
                             <code class="api-link-url" :title="vodApiLinks.tvbox">{{ vodApiLinks.tvbox }}</code>
@@ -55,6 +58,13 @@
                             <span class="api-link-label">🔗 VOD API</span>
                             <code class="api-link-url" :title="vodApiLinks.api">{{ vodApiLinks.api }}</code>
                             <button class="api-copy-btn" @click="copyToClipboard(vodApiLinks.api)" title="复制 VOD API 链接">📋</button>
+                        </div>
+                    </div>
+                    <div v-else-if="activeTab === 'live'" class="api-links-panel" key="live">
+                        <div class="api-link-item">
+                            <span class="api-link-label">📺 M3U 订阅链接</span>
+                            <code class="api-link-url" :title="liveM3uUrl">{{ liveM3uUrl }}</code>
+                            <button class="api-copy-btn" @click="copyToClipboard(liveM3uUrl)" title="复制 M3U 订阅链接">📋</button>
                         </div>
                     </div>
                 </transition>
@@ -234,7 +244,210 @@
                 </div>
             </section>
 
+            <!-- 板块四：直播频道管理 -->
+            <section v-if="activeTab === 'live'" class="tab-pane">
+                <!-- 页面工作区：顶部导入与统计 -->
+                <div class="live-top-panel">
+                    <!-- 导入卡片 -->
+                    <div class="card import-card">
+                        <div class="card-header">
+                            <h3>导入外部频道</h3>
+                        </div>
+                        <div class="import-panel-content">
+                            <div class="import-options">
+                                <div class="form-group">
+                                    <label>导入格式</label>
+                                    <select v-model="importFormat">
+                                        <option value="m3u">M3U 播放列表 (*.m3u / *.m3u8)</option>
+                                        <option value="csv">CSV 文件 (*.csv)</option>
+                                    </select>
+                                </div>
+                                <div class="import-tabs">
+                                    <button :class="['import-tab-btn', { active: importMethod === 'text' }]" @click="importMethod = 'text'">📋 粘贴文本</button>
+                                    <button :class="['import-tab-btn', { active: importMethod === 'file' }]" @click="importMethod = 'file'">📁 上传文件</button>
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary" @click="importExternalChannels" :disabled="importingChannels" style="width: 100%;">
+                                        <span class="spinner" v-if="importingChannels"></span>
+                                        {{ importingChannels ? '导入中...' : '📥 开始导入' }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="import-area">
+                                <div v-if="importMethod === 'text'" style="width: 100%;">
+                                    <textarea v-model="importText" placeholder="在此粘贴 M3U 订阅内容或 CSV 频道文本（如：频道名称,组播地址,ID,分类）..." rows="4" class="import-textarea"></textarea>
+                                </div>
+                                <div v-else style="width: 100%;">
+                                    <div class="file-upload-zone" @dragover.prevent @drop.prevent="handleImportFileDrop">
+                                        <span class="upload-icon">📥</span>
+                                        <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label">选择文件<input type="file" @change="handleImportFileSelect" accept=".m3u,.m3u8,.csv" style="display:none;"></label></p>
+                                        <p v-else class="text-success" style="font-size: 12px;">已选择文件: <strong>{{ importFile.name }}</strong> <button class="btn-clear-file" @click="importFile = null" style="background:none; border:none; color:var(--color-error); cursor:pointer; font-size:12px;">[清除]</button></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <div class="card stats-card">
+                        <div class="card-header">
+                            <h3>统计信息</h3>
+                        </div>
+                        <div class="status-list horizontal-stats">
+                            <div class="status-item">
+                                <span class="status-label">服务器频道数</span>
+                                <span class="status-val highlight">{{ liveStats.server }}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">外部导入数</span>
+                                <span class="status-val highlight">{{ liveStats.external }}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">已启用</span>
+                                <span class="status-val text-success">{{ liveStats.enabled }}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">已禁用</span>
+                                <span class="status-val text-error">{{ liveStats.disabled }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 工具条 (分类设置所在的卡片) 移到导入外部频道和统计信息卡片的下面 -->
+                <div class="live-toolbar">
+                    <div class="toolbar-left">
+                        <div class="filter-group">
+                            <label>分类</label>
+                            <select v-model="liveFilter.category_id" @change="fetchLiveChannels(1)">
+                                <option :value="null">全部分类</option>
+                                <option :value="0">未分类</option>
+                                <option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>状态</label>
+                            <select v-model="liveFilter.enabled" @change="fetchLiveChannels(1)">
+                                <option :value="null">全部状态</option>
+                                <option :value="1">仅启用</option>
+                                <option :value="0">仅禁用</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>来源</label>
+                            <select v-model="liveFilter.source" @change="fetchLiveChannels(1)">
+                                <option :value="null">全部来源</option>
+                                <option value="server">服务器下发</option>
+                                <option value="external">外部导入</option>
+                            </select>
+                        </div>
+                        <div class="filter-group search-group">
+                            <input type="text" v-model="liveFilter.keyword" placeholder="搜索频道名 / ID / 序号" @keyup.enter="fetchLiveChannels(1)">
+                            <button class="btn btn-secondary btn-sm" @click="fetchLiveChannels(1)">🔍</button>
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-secondary" @click="openCategoryModal">📂 分类管理</button>
+                        <button class="btn btn-secondary" @click="openLiveConfigModal">⚙️ 直播设置</button>
+                        <button class="btn btn-secondary" @click="resetLiveChannelsOrder">🧹 恢复默认排序</button>
+                        <button class="btn btn-primary" @click="triggerLiveSync" :disabled="syncingLive || !simStatus.is_authenticated">
+                            <span class="spinner" v-if="syncingLive"></span>
+                            {{ syncingLive ? '🔄 同步中...' : '🔄 同步频道' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 页面工作区：底部直播频道列表 -->
+                <div class="live-bottom-panel">
+                    <!-- 频道表格卡片 -->
+                    <div class="card live-list-card">
+                        <div class="card-header">
+                            <h3>直播频道列表</h3>
+                            <span class="badge" v-if="liveTotal">共 {{ liveTotal }} 个</span>
+                        </div>
+
+                        <!-- 批量操作控制条 -->
+                        <div class="batch-actions-bar" v-if="selectedChannelIds.length > 0">
+                            <span class="selected-count">已选中 <strong>{{ selectedChannelIds.length }}</strong> 个频道</span>
+                            <div class="batch-buttons">
+                                <button class="btn btn-secondary btn-sm" @click="batchSetEnabled(1)">🟢 批量启用</button>
+                                <button class="btn btn-secondary btn-sm" @click="batchSetEnabled(0)">🔴 批量禁用</button>
+                                <select class="batch-cat-select" @change="batchChangeCategory($event)">
+                                    <option value="" disabled selected>📂 批量修改分类...</option>
+                                    <option value="0">其他 (未分类)</option>
+                                    <option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                                </select>
+                                <button class="btn btn-danger btn-sm" @click="batchDelete">🗑️ 批量删除</button>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="live-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px; text-align: center;">
+                                            <input type="checkbox" v-model="selectAllChannels" @change="toggleSelectAll">
+                                        </th>
+                                        <th style="width: 60px; text-align: center;">启用</th>
+                                        <th style="width: 50px; text-align: center;">排序</th>
+                                        <th>频道名称</th>
+                                        <th style="width: 140px;">序号 / ID</th>
+                                        <th style="width: 130px;">所属分类</th>
+                                        <th>播放地址</th>
+                                        <th style="width: 130px; text-align: center;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="live-channel-list-tbody" :key="tbodyKey">
+                                    <tr v-if="liveChannels.length === 0">
+                                        <td colspan="8" class="empty-row" style="text-align: center; padding: 30px; color: var(--text-muted);">暂无满足条件的频道数据，请尝试同步或手动导入</td>
+                                    </tr>
+                                    <tr v-for="ch in liveChannels" :key="ch.id" :data-id="ch.id" class="live-channel-row">
+                                        <td style="text-align: center;">
+                                            <input type="checkbox" :value="ch.id" v-model="selectedChannelIds">
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <label class="switch-toggle">
+                                                <input type="checkbox" :checked="ch.is_enabled === 1" @change="toggleChannelEnabled(ch)">
+                                                <span class="switch-slider"></span>
+                                            </label>
+                                        </td>
+                                        <td style="text-align: center;" class="drag-handle">
+                                            <span style="cursor: move; color: var(--text-muted); font-size: 16px;">☰</span>
+                                        </td>
+                                        <td>
+                                            <span class="channel-name-val" style="font-weight: 500;">{{ ch.name }}</span>
+                                            <span v-if="ch.source === 'external'" class="badge" style="background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); margin-left: 6px; padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid rgba(var(--color-primary-rgb), 0.2);">外部</span>
+                                            <span v-if="ch.timeshift_enabled === 1" class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; margin-left: 6px; padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.2);" title="支持时移回看">时移</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-secondary" style="font-weight: 600;" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span>
+                                            <span class="text-muted" style="font-size: 11px; margin-left: 8px;" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span>
+                                        </td>
+                                        <td>
+                                            <span class="cat-tag" :style="{ borderLeft: '4px solid ' + (ch.category_color || 'var(--color-primary)') }">
+                                                {{ ch.category_name || '未分类' }}
+                                            </span>
+                                        </td>
+                                        <td class="url-cell" :title="ch.multicast_url || ch.unicast_url">
+                                            <code class="url-text">{{ ch.multicast_url || ch.unicast_url || '—' }}</code>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <div class="row-actions justify-center">
+                                                <button class="btn-text btn-text-primary" @click="editChannel(ch)" title="编辑属性">✏️ 编辑</button>
+                                                <button v-if="ch.source === 'external'" class="btn-text btn-text-danger" @click="deleteChannel(ch.id)" title="删除外部频道">🗑️ 删除</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
             <!-- 板块三：系统日志 -->
+
             <section v-if="activeTab === 'log'" class="tab-pane">
                 <div class="card log-card">
                     <div class="card-header">
@@ -266,8 +479,198 @@
                 </div>
             </section>
         </main>
+
+
+
+        <!-- 直播频道设置弹窗 -->
+        <transition name="fade">
+            <div class="modal-overlay" v-if="showLiveConfigModal" @click.self="showLiveConfigModal = false">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3>直播频道配置</h3>
+                        <button class="modal-close" @click="showLiveConfigModal = false">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>udpxy 代理服务地址</label>
+                            <input type="text" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688">
+                            <small class="form-help">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
+                        </div>
+                        <div class="form-group">
+                            <label>EPG XML 地址</label>
+                            <input type="text" v-model="liveConfig.epg_url" placeholder="例如: http://192.168.1.3:6688/epg.xml.gz">
+                            <small class="form-help">将作为 x-tvg-url 写入 M3U 首行头。</small>
+                        </div>
+                        <div class="form-group">
+                            <label>LOGO 基础 URL</label>
+                            <input type="text" v-model="liveConfig.logo_base_url" placeholder="默认为 /static/logo/">
+                            <small class="form-help">用于拼接频道台标地址。若是相对路径，生成 M3U 时会自动拼接当前的网卡 Host 头部。</small>
+                        </div>
+                        
+                        <div class="form-group inline-checkbox-group" style="margin-top: 15px;">
+                            <label class="switch-item">
+                                <label class="switch-toggle">
+                                    <input type="checkbox" v-model="liveConfig.fcc_global_enabled_bool">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label-text">⚡ 启用全局 FCC 加速</span>
+                            </label>
+                            <small class="form-help text-muted">开启后，若频道支持 FCC，则在 udpxy 转换链接后追加 ?fcc= 提速参数。</small>
+                        </div>
+                        <div class="form-group inline-checkbox-group">
+                            <label class="switch-item">
+                                <label class="switch-toggle">
+                                    <input type="checkbox" v-model="liveConfig.timeshift_enabled_bool">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label-text">🕒 启用全局时移回看 (Catchup)</span>
+                            </label>
+                            <small class="form-help text-muted">开启后，对支持时移的频道生成 catchup="default" 时移元数据。</small>
+                        </div>
+                        <div class="form-group inline-checkbox-group">
+                            <label class="switch-item">
+                                <label class="switch-toggle">
+                                    <input type="checkbox" v-model="liveConfig.m3u_dual_line_bool">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label-text">🛤️ 启用组播+单播双线模式</span>
+                            </label>
+                            <small class="form-help text-muted">开启后，同一频道将同时生成 udpxy 组播和 RTSP 单播两行数据。</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @click="showLiveConfigModal = false">取消</button>
+                        <button class="btn btn-primary" @click="saveLiveConfig">保存设置</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- 分类管理弹窗 -->
+        <transition name="fade">
+            <div class="modal-overlay" v-if="showCategoryModal" @click.self="showCategoryModal = false">
+                <div class="modal-card modal-large">
+                    <div class="modal-header">
+                        <h3>分类频道管理</h3>
+                        <button class="modal-close" @click="showCategoryModal = false">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 新增分类 -->
+                        <div class="category-add-inline">
+                            <input type="text" v-model="newCategory.name" placeholder="分类名称" class="input-sm" style="flex:1;">
+                            <input type="number" v-model="newCategory.sort_index" placeholder="排序指数" class="input-sm" style="width: 80px;">
+                            <div class="color-picker-wrapper">
+                                <input type="color" v-model="newCategory.color" title="分类标色">
+                            </div>
+                            <button class="btn btn-primary btn-sm" @click="addLiveCategory">＋ 添加</button>
+                        </div>
+                        
+                        <!-- 列表 -->
+                        <div class="category-list-container">
+                            <table class="live-table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>分类名称</th>
+                                        <th style="width: 100px;">排序索引</th>
+                                        <th style="width: 80px; text-align: center;">标色</th>
+                                        <th style="width: 120px; text-align: center;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="live-category-list-tbody">
+                                    <tr v-for="cat in liveCategories" :key="cat.id">
+                                        <td>
+                                            <input type="text" v-model="cat.name" class="input-table-cell">
+                                        </td>
+                                        <td>
+                                            <input type="number" v-model="cat.sort_index" class="input-table-cell">
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <div class="color-picker-wrapper">
+                                                <input type="color" v-model="cat.color">
+                                            </div>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <div class="row-actions justify-center">
+                                                <button class="btn-text btn-text-primary" @click="updateLiveCategory(cat)">保存</button>
+                                                <button class="btn-text btn-text-danger" @click="deleteLiveCategory(cat.id)">删除</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" @click="showCategoryModal = false">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- 频道属性编辑弹窗 -->
+        <transition name="fade">
+            <div class="modal-overlay" v-if="showEditChannelModal" @click.self="showEditChannelModal = false">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3>编辑直播频道</h3>
+                        <button class="modal-close" @click="showEditChannelModal = false">×</button>
+                    </div>
+                    <div class="modal-body" v-if="editingCh">
+                        <div class="form-group">
+                            <label>频道名称</label>
+                            <input type="text" v-model="editingCh.name">
+                        </div>
+                        <div class="form-group">
+                            <label>所属分类</label>
+                            <select v-model="editingCh.category_id">
+                                <option :value="0">未分类</option>
+                                <option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>EPG 台标 Logo 文件名</label>
+                            <input type="text" v-model="editingCh.logo_url" placeholder="CCTV1综合高清.png">
+                            <small class="form-help">在 Logo 基础 URL 下的文件名。</small>
+                        </div>
+                        <div class="form-group">
+                            <label>EPG 匹配 ID (tvg-id)</label>
+                            <input type="text" v-model="editingCh.tvg_id">
+                        </div>
+                        <div class="form-group">
+                            <label>EPG 匹配名称 (tvg-name)</label>
+                            <input type="text" v-model="editingCh.tvg_name">
+                        </div>
+                        <div v-if="editingCh.source === 'external'">
+                            <div class="form-group">
+                                <label>组播地址 (igmp://)</label>
+                                <input type="text" v-model="editingCh.multicast_url">
+                            </div>
+                            <div class="form-group">
+                                <label>单播地址 (rtsp://)</label>
+                                <input type="text" v-model="editingCh.unicast_url">
+                            </div>
+                            <div class="form-group">
+                                <label>频道 ID (channel_id)</label>
+                                <input type="text" v-model="editingCh.channel_id">
+                            </div>
+                            <div class="form-group">
+                                <label>频道序号 (user_channel_id)</label>
+                                <input type="text" v-model="editingCh.user_channel_id">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @click="showEditChannelModal = false">取消</button>
+                        <button class="btn btn-primary" @click="saveChannelEdit">保存修改</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        </main>
     </div>
 
+    <script src="js/Sortable.min.js"></script>
     <script src="js/app.js?v=2.0"></script>
 </body>
 </html>

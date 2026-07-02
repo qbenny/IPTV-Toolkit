@@ -102,11 +102,14 @@ def _start_heartbeat():
 from src.api.tvbox import set_simulator as set_sim_tvbox
 from src.api.play import set_simulator as set_sim_play
 from src.web.routes import set_simulator as set_sim_web, set_login_func
+from src.api.live import set_simulator as set_sim_live, set_login_func as set_login_live
 
 set_sim_tvbox(sim)
 set_sim_play(sim)
 set_sim_web(sim)
 set_login_func(login_sim)
+set_sim_live(sim)
+set_login_live(login_sim)
 
 
 # ---- FastAPI 应用 ----
@@ -127,6 +130,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # 注册 Web 路由
 from src.web.routes import router as web_router
 app.include_router(web_router)
+
+# 注册直播路由
+from src.api.live import router as live_router
+app.include_router(live_router)
+
 
 # TVBox 配置接口
 from src.api.tvbox import get_tvbox_config

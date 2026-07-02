@@ -3,6 +3,7 @@
 """
 import os
 import sqlite3
+import time
 
 from src.utils.logger import logger
 
@@ -31,7 +32,7 @@ def init_db():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # 内容主表
+    # 点播内容主表
     c.execute("""
         CREATE TABLE IF NOT EXISTS vod_items (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,12 +55,104 @@ def init_db():
         )
     """)
 
-    # 索引
+    # 点播索引
     c.execute("CREATE INDEX IF NOT EXISTS idx_vod_title ON vod_items(title)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_vod_type ON vod_items(type)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_vod_country ON vod_items(country)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_vod_year ON vod_items(year)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_vod_score ON vod_items(score)")
+
+    # 直播频道分类表
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS live_categories (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT UNIQUE NOT NULL,
+            sort_index  INTEGER DEFAULT 0,
+            color       TEXT DEFAULT '',
+            is_visible  INTEGER DEFAULT 1,
+            created_at  INTEGER DEFAULT 0
+        )
+    """)
+
+    # 直播频道主表
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS live_channels (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            source            TEXT NOT NULL DEFAULT 'server',
+            channel_id        TEXT NOT NULL DEFAULT '',
+            user_channel_id   TEXT DEFAULT '',
+            name              TEXT DEFAULT '',
+            tvg_id            TEXT DEFAULT '',
+            tvg_name          TEXT DEFAULT '',
+            logo_url          TEXT DEFAULT '',
+            category_id       INTEGER DEFAULT 0,
+            sort_index        INTEGER DEFAULT 0,
+            is_enabled        INTEGER DEFAULT 1,
+            multicast_url     TEXT DEFAULT '',
+            unicast_url       TEXT DEFAULT '',
+            unicast_url_full  TEXT DEFAULT '',
+            timeshift_enabled INTEGER DEFAULT 0,
+            timeshift_length  INTEGER DEFAULT 0,
+            timeshift_url     TEXT DEFAULT '',
+            is_hd             INTEGER DEFAULT 0,
+            channel_type      TEXT DEFAULT '',
+            channel_sdp       TEXT DEFAULT '',
+            channel_url_raw   TEXT DEFAULT '',
+            channel_locked    INTEGER DEFAULT 0,
+            preview_enabled   INTEGER DEFAULT 0,
+            fcc_enabled       INTEGER DEFAULT 0,
+            fcc_ip            TEXT DEFAULT '',
+            fcc_port          TEXT DEFAULT '',
+            fec_port          TEXT DEFAULT '',
+            raw_fields_json   TEXT DEFAULT '',
+            synced_at         INTEGER DEFAULT 0,
+            created_at        INTEGER DEFAULT 0
+        )
+    """)
+
+    # 直播配置表
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS live_config (
+            key   TEXT PRIMARY KEY,
+            value TEXT DEFAULT ''
+        )
+    """)
+
+    # 直播索引
+    c.execute("CREATE INDEX IF NOT EXISTS idx_live_source ON live_channels(source)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_live_category ON live_channels(category_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_live_enabled ON live_channels(is_enabled)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_live_channel_id ON live_channels(channel_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_live_multicast ON live_channels(multicast_url)")
+
+    # 首次建表插入预置分类
+    categories = [
+        "央视高清", "央视标清", "卫视高清", "卫视标清",
+        "地方高清", "地方标清", "4K超高清", "国际",
+        "付费高清", "广播", "其他"
+    ]
+    now_time = int(time.time())
+    for idx, cat_name in enumerate(categories):
+        c.execute("""
+            INSERT OR IGNORE INTO live_categories (name, sort_index, created_at)
+            VALUES (?, ?, ?)
+        """, (cat_name, (idx + 1) * 10, now_time))
+
+    # 首次建表插入默认配置
+    default_configs = {
+        "udpxy_address": "",
+        "m3u_auth_required": "0",
+        "fcc_global_enabled": "0",
+        "timeshift_enabled": "1",
+        "epg_url": "",
+        "logo_base_url": "/static/logo/",
+        "m3u_dual_line": "0"
+    }
+    for k, v in default_configs.items():
+        c.execute("""
+            INSERT OR IGNORE INTO live_config (key, value)
+            VALUES (?, ?)
+        """, (k, v))
 
     conn.commit()
     conn.close()
@@ -69,3 +162,4 @@ def init_db():
 if __name__ == "__main__":
     init_db()
     print(f"数据库路径: {DB_PATH}")
+
