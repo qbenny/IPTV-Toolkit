@@ -74,12 +74,13 @@ async def get_xmltv():
     """)
     channels = c.fetchall()
 
-    # 获取从今天开始的节目
+    # 获取从今天开始的节目（按 EPG channel + 时间 + 标题去重，避免 HD/SD 重复）
     today = datetime.now().strftime("%Y-%m-%d 00:00:00")
     c.execute("""
         SELECT epg_channel_id, title, start_time, end_time
         FROM epg_programs
         WHERE end_time >= ?
+        GROUP BY epg_channel_id, start_time, title
         ORDER BY epg_channel_id, start_time
     """, (today,))
     programs = c.fetchall()
@@ -189,7 +190,8 @@ async def programs_now():
         SELECT channel_id, channel_name, title, start_time, end_time, epg_channel_id
         FROM epg_programs
         WHERE start_time <= ? AND end_time >= ?
-        ORDER BY channel_name
+        GROUP BY epg_channel_id, title
+        ORDER BY epg_channel_id
     """, (now, now))
     rows = c.fetchall()
     items = [dict(r) for r in rows]

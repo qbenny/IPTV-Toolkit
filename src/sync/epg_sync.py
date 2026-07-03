@@ -15,19 +15,40 @@ from src.utils.logger import logger
 
 
 def _normalize_epg(name: str) -> str:
-    """频道名归一化用于 EPG channel id（内联简化版）。"""
+    """频道名归一化（fallback 版本，仅在 live_channels 无 tvg_id 时使用）。"""
     import re
     name = name.strip()
-    # 去掉画质后缀
     for sfx in ["1080P", "720P", "超清", "高清", "标清", "极清", "FHD", "UHD", "HD", "SD", "4K", "8K"]:
         if name.endswith(sfx) and len(name) > len(sfx):
             name = name[:-len(sfx)]
             break
-    # CCTV 频道提取台号
     m = re.match(r"(CCTV[\d]+[\+]?)", name)
     if m:
         return m.group(1)
     return name.strip()
+
+
+def _build_tvg_lookup(conn) -> dict:
+    """从 live_channels 表构建 channel_id → tvg_id 映射。
+
+    优先使用 live_channels 中已设置的 tvg_id，
+    否则用 display_name 归一化作为 tvg_id。
+
+    Returns:
+        {str(channel_id): str(epg_channel_id)}
+    """
+    c = conn.cursor()
+    c.execute("SELECT channel_id, tvg_id, display_name, name FROM live_channels")
+    lookup = {}
+    for row in c.fetchall():
+        ch_id = str(row["channel_id"])
+        tvg = (row["tvg_id"] or "").strip()
+        display = (row["display_name"] or row["name"] or "").strip()
+        if tvg:
+            lookup[ch_id] = tvg
+        elif display:
+            lookup[ch_id] = _normalize_epg(display)
+    return lookup
 
 # VIS schedules API 地址
 VIS_SCHEDULES_BASE = "http://115.233.200.60:58000/epg/api/schedules/"
@@ -245,7 +266,7 @@ def full_sync(sim) -> dict:
 
     _set_epg_status(total=total_channels, progress="开始同步节目数据...")
 
-    # Step 3: 逐频道同步
+    # Step 3: 逐频道同步（跳过 EPG 已覆盖的 HD/SD 共享频道）
     today = datetime.now()
     today_str = today.strftime("%Y%m%d")
     tomorrow_str = (today + timedelta(days=1)).strftime("%Y%m%d")
@@ -255,12 +276,28 @@ def full_sync(sim) -> dict:
     total_programs = 0
     ok_channels = 0
     no_data_channels = 0
+    skipped_shared = 0   # 因EPG共享而跳过的频道
     failed_channels = []  # 仅记录网络请求失败的频道
+
+    # 从 live_channels 获取 channel_id → tvg_id 映射（与 M3U 同一来源，确保匹配）
+    tvg_lookup = _build_tvg_lookup(conn)
+
+    # 收集本次同步中已处理的 EPG channel ID（防止 HD/SD 双写）
+    synced_epg_ids = set()
 
     for i, (code, info) in enumerate(dedup.items()):
         channel_name = info["name"]
         channel_id = info["channel_id"]
         back_time = info["backTime"]
+
+        # 优先用 live_channels 的 tvg_id，保证与 M3U 完全一致
+        epg_chid = tvg_lookup.get(channel_id) or _normalize_epg(channel_name)
+
+        # 如果同一 EPG ID 已经在本轮同步过 → 跳过（HD/SD 共享）
+        if epg_chid in synced_epg_ids:
+            skipped_shared += 1
+            logger.debug("[EPG Sync] %s: 跳过(EPG '%s' 已由其他画质版本同步)", channel_name, epg_chid)
+            continue
 
         # 计算日期范围
         if back_time >= 7:
@@ -270,7 +307,6 @@ def full_sync(sim) -> dict:
         else:
             begin = today_str
 
-        epg_chid = _normalize_epg(channel_name)
         _set_epg_status(
             progress=f"[{i+1}/{total_channels}] {channel_name}",
             current_channel=channel_name,
@@ -286,6 +322,7 @@ def full_sync(sim) -> dict:
             count = _upsert_programs(conn, programs, channel_id, channel_name, epg_chid, sync_time)
             total_programs += count
             ok_channels += 1
+            synced_epg_ids.add(epg_chid)  # 标记此 EPG ID 已覆盖
             logger.debug("[EPG Sync] %s: %d 条节目 (backTime=%d)", channel_name, count, back_time)
         else:
             # 接口正常返回但无数据（广播、4K、测试频道等）
@@ -293,8 +330,8 @@ def full_sync(sim) -> dict:
 
         time.sleep(_REQUEST_INTERVAL)
 
-    logger.info("[EPG Sync] 第一轮: %d 有数据, %d 无EPG, %d 请求失败",
-                ok_channels, no_data_channels, len(failed_channels))
+    logger.info("[EPG Sync] 第一轮: %d 有数据, %d 无EPG, %d EPG共享跳过, %d 请求失败",
+                ok_channels, no_data_channels, skipped_shared, len(failed_channels))
 
     # 第二轮：只重试网络请求失败的频道
     if failed_channels:
@@ -308,7 +345,7 @@ def full_sync(sim) -> dict:
                 channel_name = info["name"]
                 channel_id = info["channel_id"]
                 back_time = info["backTime"]
-                epg_chid = _normalize_epg(channel_name)
+                epg_chid = tvg_lookup.get(channel_id) or _normalize_epg(channel_name)
 
                 time.sleep(_RETRY_BATCH_INTERVAL)
                 programs, error = _fetch_schedule(code, begin, tomorrow_str)
@@ -340,8 +377,8 @@ def full_sync(sim) -> dict:
         program_count=total_programs,
     )
 
-    logger.info("[EPG Sync] 完成: %d 频道有数据 (%d 条节目), %d 频道无EPG, %d 网络失败",
-                ok_channels, total_programs, no_data_channels, len(failed_channels))
+    logger.info("[EPG Sync] 完成: %d 频道有数据 (%d 条节目), %d 无EPG, %d EPG共享跳过, %d 网络失败",
+                ok_channels, total_programs, no_data_channels, skipped_shared, len(failed_channels))
     return {"channel_count": ok_channels, "program_count": total_programs, "no_data": no_data_channels}
 
 
