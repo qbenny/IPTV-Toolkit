@@ -196,6 +196,7 @@ def login_sim() -> bool:
         return False
 
 def ensure_authenticated():
+    sim.state.update_activity()
     if not sim.state.is_authenticated:
         login_sim()
 
@@ -210,17 +211,24 @@ def start_heartbeat_thread():
         
         def run_heartbeat():
             print(">>> [Heartbeat Thread] Started.")
+            import time as t_mod
             while True:
                 try:
-                    if sim.state.is_authenticated:
-                        sim.keep_alive()
+                    current_time = t_mod.time()
+                    if current_time - sim.state.last_active_time < 10800:
+                        if sim.state.is_authenticated:
+                            sim.keep_alive()
+                        else:
+                            # Token 失效被 keep_alive 清除后，自动触发重登录
+                            print(">>> [Heartbeat Thread] Auth state invalid, attempting re-login...")
+                            login_sim()
                     else:
-                        # Token 失效被 keep_alive 清除后，自动触发重登录
-                        print(">>> [Heartbeat Thread] Auth state invalid, attempting re-login...")
-                        login_sim()
+                        if sim.state.is_authenticated:
+                            print("已连续 3 小时无客户端请求，机顶盒进入智能休眠状态，释放会话 Token。")
+                            sim.state.clear_auth_state()
                 except Exception as e:
                     print(f">>> [Heartbeat Thread] Error: {e}")
-                time.sleep(5)
+                t_mod.sleep(5)
                 
         heartbeat_thread = threading.Thread(target=run_heartbeat, daemon=True)
         heartbeat_thread.start()

@@ -170,6 +170,18 @@ async def sync_channels():
     try:
         sim_channels = _simulator.get_channel_list()
         if not sim_channels:
+            logger.warning("[Live Sync] 首次拉取未解析出任何频道（可能 Token 已失效），尝试登录刷新会话...")
+            login_success = False
+            if _login_func:
+                login_success = _login_func()
+            else:
+                login_success = _simulator.login()
+            
+            if login_success:
+                logger.info("[Live Sync] 重新登录成功，进行第二次频道拉取...")
+                sim_channels = _simulator.get_channel_list()
+                
+        if not sim_channels:
             return {"status": "success", "count": 0, "disabled": 0, "message": "同步完成，未发现可用频道"}
             
         sync_time = int(time.time())

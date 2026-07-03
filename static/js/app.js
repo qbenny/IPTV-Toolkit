@@ -120,6 +120,7 @@ const app = createApp({
         activeTab(newTab) {
             localStorage.setItem('active_tab', newTab);
             this.stopAllPolling();
+            this.fetchSimStatus(); // Refresh auth status on tab switch
             if (newTab === 'stb') {
                 this.startSimStatusPolling();
             } else if (newTab === 'log') {
@@ -153,6 +154,7 @@ const app = createApp({
         this.initTheme();
         this.fetchStbConfig();
         this.fetchDbStats();
+        this.fetchSimStatus(); // Initial fetch of auth status globally
         if (this.activeTab === 'stb') {
             this.startSimStatusPolling();
         } else if (this.activeTab === 'live') {
