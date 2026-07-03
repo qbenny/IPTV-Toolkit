@@ -341,6 +341,7 @@
                         <button class="btn btn-secondary" @click="openCategoryModal">📂 分类管理</button>
                         <button class="btn btn-secondary" @click="openAliasModal">🔗 别名映射</button>
                         <button class="btn btn-secondary" @click="openLiveConfigModal">⚙️ 直播设置</button>
+                        <button class="btn btn-secondary" @click="sortChannelsByCategory">📑 按类别排序</button>
                         <button class="btn btn-secondary" @click="resetLiveChannelsOrder">🧹 恢复默认排序</button>
                         <button class="btn btn-primary" @click="triggerLiveSync" :disabled="syncingLive || !simStatus.is_authenticated">
                             <span class="spinner" v-if="syncingLive"></span>

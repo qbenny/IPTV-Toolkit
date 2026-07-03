@@ -974,6 +974,34 @@ const app = createApp({
             }
         },
 
+        async sortChannelsByCategory() {
+            // 按分类的排序索引排序，同分类内保持当前 sort_index
+            const catOrderMap = {};
+            this.liveCategories.forEach(cat => { catOrderMap[cat.id] = cat.sort_index || 0; });
+            const sorted = [...this.liveChannels].sort((a, b) => {
+                const orderA = catOrderMap[a.category_id] !== undefined ? catOrderMap[a.category_id] : Number.MAX_SAFE_INTEGER;
+                const orderB = catOrderMap[b.category_id] !== undefined ? catOrderMap[b.category_id] : Number.MAX_SAFE_INTEGER;
+                if (orderA !== orderB) return orderA - orderB;
+                return (a.sort_index || 0) - (b.sort_index || 0);
+            });
+            const order = sorted.map((ch, i) => ({ id: ch.id, sort_index: i }));
+            try {
+                const r = await fetch('/api/live/channels/reorder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order })
+                });
+                if (r.ok) {
+                    this.showToast('已按类别排序');
+                    this.fetchLiveChannels(1);
+                } else {
+                    this.showToast('排序失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络异常', 'error');
+            }
+        },
+
         async resetLiveChannelsOrder() {
             if (!confirm('确定要恢复默认排序吗？这会清除拖拽自定义顺序，并按系统序号/ID恢复初始顺序。')) return;
             try {
