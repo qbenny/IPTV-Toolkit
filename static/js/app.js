@@ -60,10 +60,16 @@ const app = createApp({
             },
             newCategory: { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 },
             editingCh: null,
+            showAliasModal: false,
+            aliases: [],
+            newAlias: { source_name: '', target_name: '' },
             showLiveConfigModal: false,
             showCategoryModal: false,
+            categorySortableInstance: null,
+            categoryTbodyKey: 0,
             showEditChannelModal: false,
             syncingLive: false,
+            presetColors: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#e11d48'],
             importFormat: 'm3u',
             importMethod: 'text',
             importText: '',
@@ -100,6 +106,13 @@ const app = createApp({
         liveM3uUrl() {
             const origin = window.location.origin;
             return `${origin}/api/live/tv.m3u`;
+        },
+        canBatchDelete() {
+            if (this.selectedChannelIds.length === 0) return false;
+            return this.selectedChannelIds.every(id => {
+                const ch = this.liveChannels.find(c => c.id === id);
+                return ch && ch.source === 'external';
+            });
         }
     },
 
@@ -485,6 +498,24 @@ const app = createApp({
             }
         },
 
+        async changeChannelCategory(ch) {
+            try {
+                const r = await fetch(`/api/live/channels/${ch.id}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ch)
+                });
+                if (r.ok) {
+                    this.showToast('分类已更新');
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.detail || '更新失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
         async deleteChannel(id) {
             if (!confirm('确定要删除这个外部频道吗？')) return;
             try {
@@ -538,7 +569,62 @@ const app = createApp({
 
         openCategoryModal() {
             this.showCategoryModal = true;
-            this.newCategory = { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 };
+            const nextIndex = this.liveCategories.length > 0
+                ? Math.max(...this.liveCategories.map(c => c.sort_index)) + 1
+                : 0;
+            this.newCategory = {
+                name: '', sort_index: nextIndex,
+                color: this.presetColors[Math.floor(Math.random() * this.presetColors.length)],
+                is_visible: 1, showColorPicker: false
+            };
+            // 使用 setTimeout 确保弹窗 DOM 完全渲染后再初始化 Sortable
+            setTimeout(() => { this.initCategorySortable(); }, 150);
+        },
+
+        initCategorySortable() {
+            const el = document.getElementById('live-category-list-tbody');
+            if (!el) return;
+            if (this.categorySortableInstance) { this.categorySortableInstance.destroy(); }
+            if (window.Sortable) {
+                this.categorySortableInstance = window.Sortable.create(el, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    onEnd: async (evt) => {
+                        const draggedId = parseInt(evt.item.getAttribute('data-id'));
+                        const nextEl = evt.item.nextElementSibling;
+                        let targetSiblingId = null;
+                        if (nextEl) { targetSiblingId = parseInt(nextEl.getAttribute('data-id')); }
+                        const draggedItems = this.liveCategories.filter(c => c.id === draggedId);
+                        const remainingItems = this.liveCategories.filter(c => c.id !== draggedId);
+                        let insertIdx = remainingItems.length;
+                        if (targetSiblingId !== null) {
+                            const idx = remainingItems.findIndex(c => c.id === targetSiblingId);
+                            if (idx !== -1) insertIdx = idx;
+                        }
+                        remainingItems.splice(insertIdx, 0, ...draggedItems);
+                        // 更新每个 item 的 sort_index，使界面即时反映新序号
+                        remainingItems.forEach((item, index) => { item.sort_index = index; });
+                        const order = remainingItems.map((item, index) => ({ id: item.id, sort_index: index }));
+                        this.liveCategories = remainingItems;
+                        this.categoryTbodyKey++;
+                        this.$nextTick(() => { this.initCategorySortable(); });
+                        try {
+                            const r = await fetch('/api/live/categories/reorder', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ order })
+                            });
+                            if (r.ok) {
+                                this.showToast('分类排序已更新');
+                                // 从服务器重新加载以保持数据一致
+                                await this.fetchLiveCategories();
+                                this.categoryTbodyKey++;
+                                this.$nextTick(() => { this.initCategorySortable(); });
+                            }
+                            else { this.showToast('保存排序失败', 'error'); }
+                        } catch(e) { this.showToast('排序请求失败', 'error'); }
+                    }
+                });
+            }
         },
 
         async addLiveCategory() {
@@ -554,8 +640,13 @@ const app = createApp({
                 });
                 if (r.ok) {
                     this.showToast('分类添加成功');
-                    this.fetchLiveCategories();
-                    this.newCategory = { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 };
+                    await this.fetchLiveCategories();
+                    const nextIdx = this.liveCategories.length > 0
+                        ? Math.max(...this.liveCategories.map(c => c.sort_index)) + 1
+                        : 0;
+                    this.newCategory = { name: '', sort_index: nextIdx, color: '#6366f1', is_visible: 1, showColorPicker: false };
+                    this.categoryTbodyKey++;
+                    this.$nextTick(() => { this.initCategorySortable(); });
                 } else {
                     const data = await r.json();
                     this.showToast(data.detail || '添加失败', 'error');
@@ -574,8 +665,10 @@ const app = createApp({
                 });
                 if (r.ok) {
                     this.showToast('分类修改成功');
-                    this.fetchLiveCategories();
+                    await this.fetchLiveCategories();
                     this.fetchLiveChannels(this.liveFilter.page);
+                    this.categoryTbodyKey++;
+                    this.$nextTick(() => { this.initCategorySortable(); });
                 } else {
                     const data = await r.json();
                     this.showToast(data.detail || '修改失败', 'error');
@@ -586,13 +679,15 @@ const app = createApp({
         },
 
         async deleteLiveCategory(id) {
-            if (!confirm('确定要删除此分类吗？关联的频道将自动归入“未分类”。')) return;
+            if (!confirm('确定要删除此分类吗？关联的频道将自动归入"未分类"。')) return;
             try {
                 const r = await fetch(`/api/live/categories/${id}`, { method: 'DELETE' });
                 if (r.ok) {
                     this.showToast('分类删除成功');
-                    this.fetchLiveCategories();
+                    await this.fetchLiveCategories();
                     this.fetchLiveChannels(this.liveFilter.page);
+                    this.categoryTbodyKey++;
+                    this.$nextTick(() => { this.initCategorySortable(); });
                 } else {
                     this.showToast('删除失败', 'error');
                 }
@@ -671,6 +766,118 @@ const app = createApp({
             }
         },
 
+        openAliasModal() {
+            this.showAliasModal = true;
+            this.fetchAliases();
+        },
+        quickAddAlias(sourceName) {
+            this.newAlias.source_name = sourceName;
+            this.newAlias.target_name = '';
+            this.showAliasModal = true;
+            this.fetchAliases();
+            this.$nextTick(() => {
+                const inputs = document.querySelectorAll('.category-add-inline input[type=text]');
+                if (inputs.length >= 2) inputs[1].focus();
+            });
+        },
+        async fetchAliases() {
+            try {
+                const r = await fetch('/api/live/aliases');
+                this.aliases = await r.json();
+            } catch(e) {}
+        },
+        async addAlias() {
+            if (!this.newAlias.source_name.trim() || !this.newAlias.target_name.trim()) {
+                this.showToast('原始名称和规范名称均不能为空', 'error'); return;
+            }
+            try {
+                const r = await fetch('/api/live/aliases', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.newAlias)
+                });
+                if (r.ok) {
+                    const res = await r.json();
+                    this.showToast('别名添加成功' + (res.affected_channels ? '，已更新 ' + res.affected_channels + ' 个频道' : ''));
+                    this.newAlias = { source_name: '', target_name: '' };
+                    this.fetchAliases();
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.detail || '添加失败', 'error');
+                }
+            } catch(e) { this.showToast('网络错误', 'error'); }
+        },
+        async saveAlias(a) {
+            try {
+                const r = await fetch(`/api/live/aliases/${a.id}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source_name: a.source_name, target_name: a.target_name })
+                });
+                if (r.ok) {
+                    const res = await r.json();
+                    this.showToast('别名保存成功' + (res.affected_channels ? '，已更新 ' + res.affected_channels + ' 个频道' : ''));
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.detail || '保存失败', 'error');
+                }
+            } catch(e) { this.showToast('网络错误', 'error'); }
+        },
+        async deleteAlias(id) {
+            if (!confirm('确定要删除这个别名映射吗？相关频道将恢复原始名称。')) return;
+            try {
+                const r = await fetch(`/api/live/aliases/${id}`, { method: 'DELETE' });
+                if (r.ok) {
+                    this.showToast('别名删除成功，频道已恢复原始名称');
+                    this.fetchAliases();
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else { this.showToast('删除失败', 'error'); }
+            } catch(e) { this.showToast('网络错误', 'error'); }
+        },
+        async reapplyAliases() {
+            try {
+                const r = await fetch('/api/live/aliases/reapply', { method: 'POST' });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(`已重新应用：${res.applied} 条映射，${res.affected} 个频道`);
+                    this.fetchLiveChannels(this.liveFilter.page);
+                } else { this.showToast(res.detail || '应用失败', 'error'); }
+            } catch(e) { this.showToast('网络错误', 'error'); }
+        },
+        async exportAliases() {
+            try {
+                const r = await fetch('/api/live/aliases/export');
+                const data = await r.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `live_aliases_${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.showToast(`已导出 ${data.count} 条别名映射`);
+            } catch(e) { this.showToast('导出失败', 'error'); }
+        },
+        triggerAliasImport() { this.$refs.aliasFileInput.click(); },
+        async handleAliasFileImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const r = await fetch('/api/live/aliases/import', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(`导入成功，共 ${res.imported} 条映射`);
+                    this.fetchAliases();
+                } else { this.showToast(res.detail || '导入失败', 'error'); }
+            } catch(e) { this.showToast('文件解析失败，请检查 JSON 格式', 'error'); }
+            e.target.value = '';
+        },
+
         changeLivePage(page) {
             this.fetchLiveChannels(page);
         },
@@ -736,6 +943,14 @@ const app = createApp({
 
         async batchDelete() {
             if (this.selectedChannelIds.length === 0) return;
+            const hasServer = this.selectedChannelIds.some(id => {
+                const ch = this.liveChannels.find(c => c.id === id);
+                return ch && ch.source === 'server';
+            });
+            if (hasServer) {
+                this.showToast('服务器频道不能删除，请取消选中后重试', 'error');
+                return;
+            }
             if (!confirm(`确定要删除选中的 ${this.selectedChannelIds.length} 个频道吗？`)) return;
             try {
                 const r = await fetch('/api/live/channels/batch-delete', {
