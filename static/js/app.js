@@ -67,6 +67,7 @@ const app = createApp({
             showCategoryModal: false,
             categorySortableInstance: null,
             categoryTbodyKey: 0,
+            categoryImportCleanMode: false,
             showEditChannelModal: false,
             syncingLive: false,
             presetColors: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#e11d48'],
@@ -431,6 +432,26 @@ const app = createApp({
             const base = this.liveConfig.logo_base_url || '/static/logo/';
             const cleanBase = base.endsWith('/') ? base : base + '/';
             return cleanBase + logo;
+        },
+
+        handleLogoError(ch) {
+            if (ch.logo_fallback_tried) {
+                ch.logo_failed = true;
+                return;
+            }
+            ch.logo_fallback_tried = true;
+            const logo = ch.logo_url;
+            if (logo) {
+                const lower = logo.toLowerCase();
+                if (lower.includes('4k') || lower.includes('8k')) {
+                    const cleanLogo = logo.replace(/(?:\s*|-|_)?(?:4[kK]|8[kK])/g, '');
+                    if (cleanLogo && cleanLogo !== logo) {
+                        ch.logo_url = cleanLogo;
+                        return;
+                    }
+                }
+            }
+            ch.logo_failed = true;
         },
 
         async triggerLiveSync() {
@@ -875,6 +896,43 @@ const app = createApp({
                 if (r.ok) {
                     this.showToast(`导入成功，共 ${res.imported} 条映射`);
                     this.fetchAliases();
+                } else { this.showToast(res.detail || '导入失败', 'error'); }
+            } catch(e) { this.showToast('文件解析失败，请检查 JSON 格式', 'error'); }
+            e.target.value = '';
+        },
+
+        async exportCategoryMappings() {
+            try {
+                const r = await fetch('/api/live/categories/mappings/export');
+                const data = await r.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `live_category_mappings_${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.showToast(`已导出 ${data.count} 条频道-分类关系`);
+            } catch(e) { this.showToast('导出关系失败', 'error'); }
+        },
+        triggerCategoryMappingImport() {
+            this.$refs.categoryMappingFileInput.click();
+        },
+        async handleCategoryMappingFileImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const r = await fetch('/api/live/categories/mappings/import', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const res = await r.json();
+                if (r.ok) {
+                    this.showToast(`导入成功：关联了 ${res.imported_channels} 个频道的分类` + (res.created_categories ? `，自动创建了 ${res.created_categories} 个新分类` : ''));
+                    this.fetchLiveCategories();
+                    this.fetchLiveChannels(this.liveFilter.page);
                 } else { this.showToast(res.detail || '导入失败', 'error'); }
             } catch(e) { this.showToast('文件解析失败，请检查 JSON 格式', 'error'); }
             e.target.value = '';

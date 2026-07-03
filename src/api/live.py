@@ -209,10 +209,16 @@ async def sync_channels():
                         is_enabled = 1
                         logger.info(f"[Live Sync] 频道 {ch['name']} (ID: {channel_id}) 重新上线，自动恢复启用")
                 
+                resolved = resolve_channel_names(ch["name"], alias_map)
+                
                 c.execute("""
                     UPDATE live_channels SET
                         user_channel_id = ?,
                         name = ?,
+                        display_name = ?,
+                        tvg_id = ?,
+                        tvg_name = ?,
+                        logo_url = ?,
                         multicast_url = ?,
                         unicast_url = ?,
                         unicast_url_full = ?,
@@ -236,6 +242,10 @@ async def sync_channels():
                 """, (
                     ch["user_channel_id"],
                     ch["name"],
+                    resolved["display_name"],
+                    resolved["tvg_id"],
+                    resolved["tvg_name"],
+                    resolved["logo_url"],
                     ch["multicast_url"],
                     ch["unicast_url"],
                     ch["unicast_url_full"],
@@ -737,6 +747,170 @@ async def reorder_categories(payload: dict):
     return {"status": "success"}
 
 
+@router.get("/categories/export")
+async def export_categories():
+    """导出分类为 JSON。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT name, sort_index, color, is_visible FROM live_categories ORDER BY sort_index ASC, id ASC")
+    rows = c.fetchall()
+    conn.close()
+
+    categories = [{
+        "name": r["name"],
+        "sort_index": r["sort_index"],
+        "color": r["color"],
+        "is_visible": r["is_visible"]
+    } for r in rows]
+
+    return {
+        "version": 1,
+        "exported_at": int(time.time()),
+        "count": len(categories),
+        "categories": categories
+    }
+
+
+@router.post("/categories/import")
+async def import_categories(data: dict):
+    """从 JSON 导入分类（覆盖或合并）。"""
+    categories = data.get("categories", [])
+    clean_mode = data.get("clean", False)
+    if not categories:
+        raise HTTPException(status_code=400, detail="categories 列表不能为空")
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        imported = 0
+        updated = 0
+        deleted = 0
+        now = int(time.time())
+        imported_names = []
+
+        for item in categories:
+            name = item.get("name", "").strip()
+            if not name:
+                continue
+            sort_index = int(item.get("sort_index", 0))
+            color = item.get("color", "").strip()
+            is_visible = int(item.get("is_visible", 1))
+            imported_names.append(name)
+
+            c.execute("SELECT id FROM live_categories WHERE name = ?", (name,))
+            row = c.fetchone()
+            if row:
+                c.execute(
+                    "UPDATE live_categories SET sort_index = ?, color = ?, is_visible = ? WHERE id = ?",
+                    (sort_index, color, is_visible, row["id"])
+                )
+                updated += 1
+            else:
+                c.execute(
+                    "INSERT INTO live_categories (name, sort_index, color, is_visible, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (name, sort_index, color, is_visible, now)
+                )
+                imported += 1
+
+        if clean_mode and imported_names:
+            placeholders = ",".join("?" for _ in imported_names)
+            c.execute(f"SELECT id, name FROM live_categories WHERE name NOT IN ({placeholders})", imported_names)
+            to_delete = c.fetchall()
+            for row in to_delete:
+                cat_id = row["id"]
+                c.execute("UPDATE live_channels SET category_id = 0 WHERE category_id = ?", (cat_id,))
+                c.execute("DELETE FROM live_categories WHERE id = ?", (cat_id,))
+                deleted += 1
+
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"导入失败: {e}")
+    conn.close()
+    return {
+        "status": "success",
+        "imported": imported,
+        "updated": updated,
+        "deleted": deleted
+    }
+
+
+@router.get("/categories/mappings/export")
+async def export_category_mappings():
+    """导出频道与分类的对应关系为 JSON。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT c.name as channel_name, cat.name as category_name
+        FROM live_channels c
+        JOIN live_categories cat ON c.category_id = cat.id
+        WHERE c.category_id > 0
+        ORDER BY cat.sort_index ASC, c.id ASC
+    """)
+    rows = c.fetchall()
+    conn.close()
+
+    mappings = [{"channel_name": r["channel_name"], "category_name": r["category_name"]} for r in rows]
+    return {
+        "version": 1,
+        "exported_at": int(time.time()),
+        "count": len(mappings),
+        "mappings": mappings
+    }
+
+
+@router.post("/categories/mappings/import")
+async def import_category_mappings(data: dict):
+    """从 JSON 导入频道与分类的对应关系。"""
+    mappings = data.get("mappings", [])
+    if not mappings:
+        raise HTTPException(status_code=400, detail="mappings 列表不能为空")
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        imported = 0
+        created_categories = 0
+        now = int(time.time())
+        
+        c.execute("SELECT id, name FROM live_categories")
+        cat_map = {row["name"]: row["id"] for row in c.fetchall()}
+
+        for item in mappings:
+            ch_name = item.get("channel_name", "").strip()
+            cat_name = item.get("category_name", "").strip()
+            if not ch_name or not cat_name:
+                continue
+
+            if cat_name not in cat_map:
+                c.execute(
+                    "INSERT INTO live_categories (name, sort_index, color, created_at) VALUES (?, 99, '', ?)",
+                    (cat_name, now)
+                )
+                cat_id = c.lastrowid
+                cat_map[cat_name] = cat_id
+                created_categories += 1
+            else:
+                cat_id = cat_map[cat_name]
+
+            c.execute(
+                "UPDATE live_channels SET category_id = ? WHERE name = ?",
+                (cat_id, ch_name)
+            )
+            imported += c.rowcount
+
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"导入失败: {e}")
+    conn.close()
+    return {
+        "status": "success",
+        "imported_channels": imported,
+        "created_categories": created_categories
+    }
+
+
 @router.post("/import")
 async def import_channels(
     request: Request,
@@ -1158,6 +1332,22 @@ async def generate_m3u(
             return ""
         if logo_path.startswith("http://") or logo_path.startswith("https://"):
             return logo_path
+            
+        import os
+        import re
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        logo_dir = os.path.join(project_root, "static", "logo")
+        
+        full_path = os.path.join(logo_dir, logo_path)
+        if not os.path.exists(full_path):
+            lower = logo_path.lower()
+            if "4k" in lower or "8k" in lower:
+                clean_name = re.sub(r'(?:\s*|-|_)?(?:4[kK]|8[kK])', '', logo_path)
+                if clean_name and clean_name != logo_path:
+                    fallback_path = os.path.join(logo_dir, clean_name)
+                    if os.path.exists(fallback_path):
+                        logo_path = clean_name
+
         if logo_base_url.startswith("http://") or logo_base_url.startswith("https://"):
             return f"{logo_base_url.rstrip('/')}/{logo_path.lstrip('/')}"
         else:

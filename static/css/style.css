@@ -1339,9 +1339,7 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     margin-bottom: 4px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    display: block;
     word-break: break-all;
     transition: background-color 0.2s;
 }
@@ -1352,16 +1350,22 @@ body {
 
 .log-time {
     color: #64748b;
-    flex-shrink: 0;
+    display: inline-block;
+    margin-right: 8px;
 }
 
 .log-level-text {
     font-weight: 600;
     font-size: 13px;
     text-transform: uppercase;
-    flex-shrink: 0;
     min-width: 45px;
     display: inline-block;
+    margin-right: 8px;
+}
+
+.log-message {
+    display: inline;
+    line-height: 1.6;
 }
 
 /* Colors for levels */

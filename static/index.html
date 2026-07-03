@@ -15,7 +15,7 @@
         <aside class="sidebar">
             <div class="brand">
                 <span class="logo-icon">📺</span>
-                <h2>IPTV Panel</h2>
+                <h2>IPTV-Toolkit</h2>
             </div>
             
             <nav class="nav-menu">
@@ -412,10 +412,10 @@
                                         </td>
                                         <td style="white-space: nowrap;">
                                             <span class="text-secondary" style="font-weight: 600;" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span>
-                                            <span class="text-muted" style="font-size: 11px;" v-else-if="ch.channel_id">{{ ch.channel_id }}</span>
+                                            <span class="text-muted" style="font-size: 11px; margin-left: 8px;" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span>
                                         </td>
                                         <td style="text-align: center; padding: 4px;">
-                                            <img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.05); padding: 2px; border: 1px solid var(--border-color);" @error="ch.logo_failed = true">
+                                            <img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.05); padding: 2px; border: 1px solid var(--border-color);" @error="handleLogoError(ch)">
                                             <span v-else style="color: var(--text-muted); font-size: 14px;">📺</span>
                                         </td>
                                         <td style="white-space: nowrap;">
@@ -644,6 +644,15 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                            <div class="row-actions" style="justify-content: flex-start; gap: 8px;">
+                                <button class="btn btn-secondary btn-sm" @click="exportCategoryMappings">📤 导出“频道-分类”关系</button>
+                                <button class="btn btn-secondary btn-sm" @click="triggerCategoryMappingImport">📥 导入“频道-分类”关系</button>
+                            </div>
+                            <small class="form-help" style="margin-top: 4px;">
+                                导出或导入频道与分类的对应分配关系。导入时若对应分类不存在，系统将自动创建该分类，并自动关联频道。
+                            </small>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-primary" @click="showCategoryModal = false">关闭</button>
@@ -798,6 +807,7 @@
         </transition>
 
         <input type="file" ref="aliasFileInput" accept=".json" @change="handleAliasFileImport" style="display:none;">
+        <input type="file" ref="categoryMappingFileInput" accept=".json" @change="handleCategoryMappingFileImport" style="display:none;">
 
         </main>
     </div>
