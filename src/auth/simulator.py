@@ -2,6 +2,7 @@
 STB 模拟器主类 - 包含登录、心跳、点播播放地址解析等功能。
 从 run_simulator.py 迁移。
 """
+import json
 import random
 import re
 import time
@@ -402,3 +403,107 @@ class STBSimulator:
         except Exception as e:
             self.logger.error("获取电视剧剧集信息失败: %s", e)
             return None
+
+    def get_channel_list(self) -> list:
+        """获取机顶盒的直播频道列表。
+
+        该方法向 /EPG/jsp/getchannellistHWCTC.jsp 发送 POST 请求，
+        拉取服务器返回的频道信息并解析出完整字段（20+ 个）。
+        """
+        if not self.state.is_authenticated:
+            self.logger.error("未认证，无法获取频道列表。")
+            return []
+
+        self.logger.info("========== 开始拉取频道列表 ==========")
+        stbid_sub = self.config.stb_id[6:12] if len(self.config.stb_id) >= 12 else "990060"
+        
+        payload = {
+            "conntype": "4",
+            "UserToken": self.state.user_token,
+            "tempKey": "92FFB4697440F8091240BEEDBD935E9E",
+            "stbid": stbid_sub,
+            "SupportHD": "1",
+            "UserID": self.config.user_id,
+            "Lang": "1"
+        }
+
+        url = f"{self.state.epg_base_url}/EPG/jsp/getchannellistHWCTC.jsp"
+        try:
+            res = self.state.session.post(
+                url,
+                data=payload,
+                headers={
+                    **self.config.headers, 
+                    "Content-Type": "application/x-www-form-urlencoded", 
+                    "Referer": f"{self.state.epg_base_url}/EPG/jsp/ValidAuthenticationHWCTC.jsp"
+                },
+                timeout=15
+            )
+            self._log_request("POST", url, res)
+
+            if res.status_code != 200:
+                self.logger.error("频道列表请求失败，HTTP 状态码: %d", res.status_code)
+                return []
+
+            channel_blocks = re.findall(
+                r"Authentication\.CTCSetConfig\(\s*['\"]Channel['\"]\s*,\s*['\"](.+?)['\"]\s*\)", 
+                res.text
+            )
+            
+            channels = []
+            for block in channel_blocks:
+                kv_pairs = re.findall(r'(\w+)="([^"]*)"', block)
+                ch_info = {k: v for k, v in kv_pairs}
+                
+                if "ChannelName" in ch_info and "ChannelURL" in ch_info:
+                    play_url_raw = ch_info.get("ChannelURL", "")
+                    urls = play_url_raw.split('|')
+                    multicast_url = ""
+                    unicast_url_full = ""
+                    unicast_url = ""
+                    for u in urls:
+                        if u.startswith("igmp://"):
+                            multicast_url = u
+                        elif u.startswith("rtsp://") or u.startswith("http://"):
+                            unicast_url_full = u
+                            if '?' in u:
+                                unicast_url = u.split('?', 1)[0]
+                            else:
+                                unicast_url = u
+                            
+                    def to_int(val, default=0):
+                        try:
+                            return int(val) if val else default
+                        except ValueError:
+                            return default
+
+                    channel_data = {
+                        "channel_id": ch_info.get("ChannelID", ""),
+                        "user_channel_id": ch_info.get("UserChannelID", ""),
+                        "name": ch_info.get("ChannelName", ""),
+                        "multicast_url": multicast_url,
+                        "unicast_url": unicast_url,
+                        "unicast_url_full": unicast_url_full,
+                        "timeshift_enabled": to_int(ch_info.get("TimeShift", "0")),
+                        "timeshift_length": to_int(ch_info.get("TimeShiftLength", "0")),
+                        "timeshift_url": ch_info.get("TimeShiftURL", ""),
+                        "is_hd": to_int(ch_info.get("IsHDChannel", "0")),
+                        "channel_type": ch_info.get("ChannelType", ""),
+                        "channel_sdp": ch_info.get("ChannelSDP", ""),
+                        "channel_url_raw": play_url_raw,
+                        "channel_locked": to_int(ch_info.get("ChannelLocked", "0")),
+                        "preview_enabled": to_int(ch_info.get("PreviewEnable", "0")),
+                        "fcc_enabled": to_int(ch_info.get("FCCEnable", "0")),
+                        "fcc_ip": ch_info.get("ChannelFCCIP", ""),
+                        "fcc_port": ch_info.get("ChannelFCCPort", ""),
+                        "fec_port": ch_info.get("ChannelFECPort", ""),
+                        "raw_fields_json": json.dumps(ch_info, ensure_ascii=False)
+                    }
+                    channels.append(channel_data)
+
+            self.logger.info("成功拉取并解析出 %d 个频道！", len(channels))
+            return channels
+
+        except Exception as e:
+            self.logger.error("获取频道列表时遭遇异常: %s", e, exc_info=True)
+            return []
