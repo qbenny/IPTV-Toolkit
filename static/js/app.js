@@ -105,7 +105,7 @@ const app = createApp({
         },
         liveM3uUrl() {
             const origin = window.location.origin;
-            return `${origin}/api/live/tv.m3u`;
+            return `${origin}/tv.m3u`;
         },
         canBatchDelete() {
             if (this.selectedChannelIds.length === 0) return false;

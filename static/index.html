@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/static/">
     <title>IPTV & VOD 管理面板</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css?v=2.0">
@@ -256,7 +257,7 @@
                         <div class="import-panel-content">
                             <div class="import-options">
                                 <div class="import-tabs" style="margin-top: 0;">
-                                    <button :class="['import-tab-btn', { active: importMethod === 'text' }]" @click="importMethod = 'text'">📋 粘贴文本</button>
+                                    <button :class="['import-tab-btn', { active: importMethod === 'text' }]" @click="importMethod = 'text'">🔗 URL / 文本</button>
                                     <button :class="['import-tab-btn', { active: importMethod === 'file' }]" @click="importMethod = 'file'">📁 上传文件</button>
                                 </div>
                                 <div class="form-actions" style="margin-top: 15px;">
@@ -268,7 +269,7 @@
                             </div>
                             <div class="import-area">
                                 <div v-if="importMethod === 'text'" style="width: 100%;">
-                                    <textarea v-model="importText" placeholder="在此粘贴 M3U 订阅内容或 M3U8 播放列表文本..." rows="4" class="import-textarea"></textarea>
+                                    <textarea v-model="importText" placeholder="在此粘贴 M3U 订阅链接或 M3U 文本内容..." rows="4" class="import-textarea"></textarea>
                                 </div>
                                 <div v-else style="width: 100%;">
                                     <div class="file-upload-zone" @dragover.prevent @drop.prevent="handleImportFileDrop">

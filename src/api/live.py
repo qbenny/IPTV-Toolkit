@@ -5,6 +5,7 @@ import json
 import time
 import io
 import os
+import requests
 from typing import Optional, List
 from src.db.models import get_db_connection
 from src.utils.logger import logger
@@ -743,8 +744,32 @@ async def import_channels(
 
     if not content.strip():
         raise HTTPException(status_code=400, detail="导入内容不能为空")
-        
-    imported_list = parse_m3u_content(content)
+
+    # 如果传入的是 URL，先下载内容
+    text = content.strip()
+    if text.startswith("http://") or text.startswith("https://"):
+        try:
+            resp = requests.get(text, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            # 检测是否为 HTML 页面（如 GitHub blob 页），给出提示
+            ct = resp.headers.get("Content-Type", "")
+            if "text/html" in ct or resp.text.strip().startswith("<!DOCTYPE html>") or resp.text.strip().startswith("<html"):
+                if "github.com" in text and "/blob/" in text:
+                    raw_url = text.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+                    raise HTTPException(status_code=400, detail=f"链接返回的是 GitHub 网页，请改用 raw 原始链接: {raw_url}")
+                raise HTTPException(status_code=400, detail="该链接返回的是 HTML 网页，请确认是 M3U 文件的原始下载地址")
+            # 优先尝试 UTF-8 解码，回退到 GBK
+            raw = resp.content
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                text = raw.decode("gbk", errors="ignore")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"下载 M3U 链接失败: {e}")
+    
+    imported_list = parse_m3u_content(text)
         
     if not imported_list:
         return {"new": 0, "skipped": 0, "total": 0, "message": "未解析出任何有效频道，请检查是否为标准 M3U 格式"}

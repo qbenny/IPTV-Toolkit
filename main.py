@@ -132,8 +132,11 @@ from src.web.routes import router as web_router
 app.include_router(web_router)
 
 # 注册直播路由
-from src.api.live import router as live_router
+from src.api.live import router as live_router, generate_m3u
 app.include_router(live_router)
+
+# M3U 订阅快捷路由
+app.get("/tv.m3u")(generate_m3u)
 
 
 # TVBox 配置接口

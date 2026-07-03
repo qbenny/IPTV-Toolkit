@@ -7,7 +7,7 @@ import threading
 from datetime import datetime
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 
 from src.utils.logger import logger, LOG_FILE
 from src.db.crud import get_stats as get_db_stats
@@ -65,7 +65,9 @@ def _save_stb_config(config_in: dict):
 
 @router.get("/settings")
 async def get_settings():
-    return RedirectResponse(url="/static/index.html")
+    html_path = os.path.join(os.path.dirname(__file__), "..", "..", "static", "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 
 @router.get("/api/stb-config")
