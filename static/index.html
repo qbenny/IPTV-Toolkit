@@ -28,6 +28,9 @@
                 <a href="#" :class="['nav-item', { active: activeTab === 'live' }]" @click.prevent="activeTab = 'live'">
                     <span class="nav-icon">📺</span> 直播频道管理
                 </a>
+                <a href="#" :class="['nav-item', { active: activeTab === 'epg' }]" @click.prevent="activeTab = 'epg'">
+                    <span class="nav-icon">📅</span> EPG 节目管理
+                </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'log' }]" @click.prevent="activeTab = 'log'">
                     <span class="nav-icon">📋</span> 系统日志
                 </a>
@@ -453,6 +456,35 @@
                             </table>
                         </div>
 
+                    </div>
+                </div>
+            </section>
+
+            <!-- 板块五：EPG 节目管理 -->
+            <section v-if="activeTab === 'epg'" class="tab-pane">
+                <div class="card-grid">
+                    <div class="card"><div class="card-header"><h3>EPG 节目同步</h3></div>
+                        <div class="status-list" style="margin-top:15px;">
+                            <div class="status-item"><span class="status-label">同步状态</span><span :class="['status-val',epgSyncStatus.running?'text-warning':(epgSyncStatus.last_sync_time?'text-success':'text-muted')]">{{ epgSyncStatus.running?'同步中...':(epgSyncStatus.last_sync_time?'已同步':'未同步') }}</span></div>
+                            <div class="status-item" v-if="epgSyncStatus.running"><span class="status-label">进度</span><span class="status-val highlight">{{ epgSyncStatus.progress }}</span></div>
+                            <div class="status-item" v-if="epgSyncStatus.last_sync_time"><span class="status-label">上次同步</span><span class="status-val">{{ formatTime(epgSyncStatus.last_sync_time) }}</span></div>
+                        </div>
+                        <div class="form-actions" style="margin-top:20px;display:flex;gap:10px;"><button class="btn btn-primary" @click="triggerEpgSync" :disabled="epgSyncStatus.running||!simStatus.is_authenticated" style="flex:1;">{{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}</button><button class="btn btn-secondary" @click="copyEpgXmlLink">复制 EPG 地址</button></div>
+                        <small v-if="epgXmlLink" style="display:block;margin-top:8px;word-break:break-all;color:var(--text-muted);">{{ epgXmlLink }}</small>
+                    </div>
+                    <div class="card"><div class="card-header"><h3>EPG 统计</h3></div>
+                        <div class="status-list" style="margin-top:15px;">
+                            <div class="status-item"><span class="status-label">节目总数</span><span class="status-val highlight">{{ epgStats.total_programs }}</span></div>
+                            <div class="status-item"><span class="status-label">频道数</span><span class="status-val text-success">{{ epgStats.total_channels }}</span></div>
+                            <div class="status-item"><span class="status-label">日期范围</span><span class="status-val">{{ epgStats.date_range?.earliest||'-' }} ~ {{ epgStats.date_range?.latest||'-' }}</span></div>
+                        </div>
+                        <p class="status-desc" style="margin-top:16px;">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:20px;"><div class="card-header"><h3>当前正在播放</h3><button class="btn btn-secondary btn-sm" @click="fetchNowPlaying">刷新</button></div>
+                    <div class="live-ch-list" style="margin-top:10px;max-height:400px;overflow-y:auto;">
+                        <div v-if="nowPlaying.length===0" style="padding:20px;text-align:center;color:var(--text-muted);">{{ nowPlayingLoaded?'无正在播放节目':'点击刷新' }}</div>
+                        <div v-for="p in nowPlaying" :key="p.channel_id" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;font-size:14px;"><span><strong>{{ p.channel_name }}</strong><span style="color:var(--text-muted);margin-left:8px;">{{ p.title }}</span></span><span style="color:var(--text-muted);font-size:12px;">{{ p.start_time?.slice(11,16) }} - {{ p.end_time?.slice(11,16) }}</span></div>
                     </div>
                 </div>
             </section>

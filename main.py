@@ -103,6 +103,7 @@ from src.api.tvbox import set_simulator as set_sim_tvbox
 from src.api.play import set_simulator as set_sim_play
 from src.web.routes import set_simulator as set_sim_web, set_login_func
 from src.api.live import set_simulator as set_sim_live, set_login_func as set_login_live
+from src.api.epg import set_simulator as set_sim_epg, set_login_func as set_login_epg
 
 set_sim_tvbox(sim)
 set_sim_play(sim)
@@ -110,6 +111,8 @@ set_sim_web(sim)
 set_login_func(login_sim)
 set_sim_live(sim)
 set_login_live(login_sim)
+set_sim_epg(sim)
+set_login_epg(login_sim)
 
 
 # ---- FastAPI 应用 ----
@@ -137,6 +140,14 @@ app.include_router(live_router)
 
 # M3U 订阅快捷路由
 app.get("/tv.m3u")(generate_m3u)
+
+# 注册 EPG 路由
+from src.api.epg import router as epg_router
+app.include_router(epg_router)
+
+# EPG XML 快捷路由
+from src.api.epg import get_xmltv
+app.get("/epg.xml")(get_xmltv)
 
 
 # TVBox 配置接口
