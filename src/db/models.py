@@ -140,6 +140,7 @@ def init_db():
 
     # 首次建表插入默认配置
     default_configs = {
+        "udpxy_enabled": "1",
         "udpxy_address": "",
         "m3u_auth_required": "0",
         "fcc_global_enabled": "0",

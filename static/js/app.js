@@ -9,7 +9,7 @@ const { createApp } = Vue;
 const app = createApp({
     data() {
         return {
-            activeTab: 'stb',
+            activeTab: localStorage.getItem('active_tab') || 'stb',
             theme: 'dark',
 
             // Toast
@@ -105,6 +105,7 @@ const app = createApp({
 
     watch: {
         activeTab(newTab) {
+            localStorage.setItem('active_tab', newTab);
             this.stopAllPolling();
             if (newTab === 'stb') {
                 this.startSimStatusPolling();
@@ -124,6 +125,14 @@ const app = createApp({
             } else {
                 this.selectAllChannels = false;
             }
+        },
+        'liveConfig.udpxy_enabled_bool'(newVal) {
+            if (this.loadingConfig) return;
+            if (newVal) {
+                this.liveConfig.fcc_global_enabled_bool = true;
+            } else {
+                this.liveConfig.fcc_global_enabled_bool = false;
+            }
         }
     },
 
@@ -135,6 +144,10 @@ const app = createApp({
             this.startSimStatusPolling();
         } else if (this.activeTab === 'live') {
             this.initLiveTab();
+        } else if (this.activeTab === 'log') {
+            this.startLogPolling();
+        } else if (this.activeTab === 'sync') {
+            this.startSyncStatusPolling();
         }
     },
 
@@ -371,16 +384,21 @@ const app = createApp({
         },
 
         async fetchLiveConfig() {
+            this.loadingConfig = true;
             try {
                 const r = await fetch('/api/live/config');
                 const config = await r.json();
                 this.liveConfig = {
                     ...config,
+                    udpxy_enabled_bool: config.udpxy_enabled === '1',
                     fcc_global_enabled_bool: config.fcc_global_enabled === '1',
                     timeshift_enabled_bool: config.timeshift_enabled === '1',
                     m3u_dual_line_bool: config.m3u_dual_line === '1'
                 };
             } catch (e) { /* silent */ }
+            this.$nextTick(() => {
+                this.loadingConfig = false;
+            });
         },
 
         async fetchLiveStats() {
@@ -490,10 +508,12 @@ const app = createApp({
         async saveLiveConfig() {
             const payload = {
                 ...this.liveConfig,
+                udpxy_enabled: this.liveConfig.udpxy_enabled_bool ? '1' : '0',
                 fcc_global_enabled: this.liveConfig.fcc_global_enabled_bool ? '1' : '0',
                 timeshift_enabled: this.liveConfig.timeshift_enabled_bool ? '1' : '0',
                 m3u_dual_line: this.liveConfig.m3u_dual_line_bool ? '1' : '0'
             };
+            delete payload.udpxy_enabled_bool;
             delete payload.fcc_global_enabled_bool;
             delete payload.timeshift_enabled_bool;
             delete payload.m3u_dual_line_bool;
@@ -591,12 +611,12 @@ const app = createApp({
         handleImportFileDrop(e) {
             const files = e.dataTransfer.files;
             if (files && files.length > 0) {
-                this.importFile = files[0];
-                const ext = this.importFile.name.toLowerCase().split('.').pop();
-                if (ext === 'csv') {
-                    this.importFormat = 'csv';
-                } else if (ext === 'm3u' || ext === 'm3u8') {
-                    this.importFormat = 'm3u';
+                const file = files[0];
+                const ext = file.name.toLowerCase().split('.').pop();
+                if (ext === 'm3u' || ext === 'm3u8') {
+                    this.importFile = file;
+                } else {
+                    this.showToast('只支持导入 M3U 播放列表文件 (*.m3u / *.m3u8)', 'error');
                 }
             }
         },
@@ -611,7 +631,7 @@ const app = createApp({
                     }
                     const formData = new FormData();
                     formData.append('file', this.importFile);
-                    const r = await fetch(`/api/live/import?format=${this.importFormat}`, {
+                    const r = await fetch('/api/live/import', {
                         method: 'POST',
                         body: formData
                     });
@@ -621,19 +641,17 @@ const app = createApp({
                         this.importFile = null;
                         this.initLiveTab();
                     } else {
-                        const data = await r.json();
-                        this.showToast(data.detail || '导入失败', 'error');
+                        this.showToast(res.detail || res.message || '导入失败', 'error');
                     }
                 } else {
                     if (!this.importText.trim()) {
                         this.showToast('请粘贴文本内容再进行导入', 'error');
                         return;
                     }
-                    const r = await fetch(`/api/live/import?format=${this.importFormat}`, {
+                    const r = await fetch('/api/live/import', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            format: this.importFormat,
                             content: this.importText
                         })
                     });
@@ -643,8 +661,7 @@ const app = createApp({
                         this.importText = '';
                         this.initLiveTab();
                     } else {
-                        const data = await r.json();
-                        this.showToast(data.detail || '导入失败', 'error');
+                        this.showToast(res.detail || res.message || '导入失败', 'error');
                     }
                 }
             } catch (e) {

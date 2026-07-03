@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 import re
 import json
 import time
-import csv
 import io
 import os
 from typing import Optional, List
@@ -79,39 +78,6 @@ def parse_m3u_content(content: str) -> list:
                 current_inf["url"] = line
                 channels.append(current_inf)
                 current_inf = None
-    return channels
-
-
-def parse_csv_content(content: str) -> list:
-    f = io.StringIO(content)
-    reader = csv.reader(f)
-    channels = []
-    headers = None
-    
-    for row in reader:
-        if not row:
-            continue
-        if headers is None:
-            headers = [h.strip() for h in row]
-            continue
-        
-        row_dict = dict(zip(headers, [v.strip() for v in row]))
-        
-        name = row_dict.get("频道名称") or row_dict.get("name") or ""
-        url = row_dict.get("组播地址") or row_dict.get("url") or ""
-        channel_id = row_dict.get("ID") or row_dict.get("id") or ""
-        group_title = row_dict.get("分类") or row_dict.get("group") or ""
-        
-        if name and url:
-            channels.append({
-                "name": name,
-                "url": url,
-                "channel_id": channel_id,
-                "group_title": group_title,
-                "tvg_id": name,
-                "tvg_name": name,
-                "logo_url": ""
-            })
     return channels
 
 
@@ -694,42 +660,27 @@ async def delete_category(id: int):
 @router.post("/import")
 async def import_channels(
     request: Request,
-    format: Optional[str] = Query(None),
     file: Optional[UploadFile] = File(None)
 ):
-    """解析并导入外部 M3U / CSV 频道。"""
+    """解析并导入外部 M3U 频道。"""
     content = ""
     if file:
         content_bytes = await file.read()
         content = content_bytes.decode("utf-8", errors="ignore")
-        filename = file.filename.lower()
-        if not format:
-            if filename.endswith(".m3u") or filename.endswith(".m3u8"):
-                format = "m3u"
-            elif filename.endswith(".csv"):
-                format = "csv"
     else:
         try:
             body = await request.json()
-            format = body.get("format", format)
             content = body.get("content", "")
         except Exception:
             raise HTTPException(status_code=400, detail="请求体必须是 JSON 或使用表单上传文件")
 
-    if not format or format not in ("m3u", "csv"):
-        raise HTTPException(status_code=400, detail="不支持的导入格式（仅支持 m3u 和 csv）")
-        
     if not content.strip():
         raise HTTPException(status_code=400, detail="导入内容不能为空")
         
-    imported_list = []
-    if format == "m3u":
-        imported_list = parse_m3u_content(content)
-    elif format == "csv":
-        imported_list = parse_csv_content(content)
+    imported_list = parse_m3u_content(content)
         
     if not imported_list:
-        return {"new": 0, "skipped": 0, "total": 0, "message": "未解析出任何有效频道"}
+        return {"new": 0, "skipped": 0, "total": 0, "message": "未解析出任何有效频道，请检查是否为标准 M3U 格式"}
         
     conn = get_db_connection()
     c = conn.cursor()
@@ -816,6 +767,7 @@ async def generate_m3u(
 ):
     """动态生成并获取标准 M3U 订阅内容。"""
     configs = get_live_configs()
+    udpxy_enabled = configs.get("udpxy_enabled", "1") == "1"
     udpxy_address = configs.get("udpxy_address", "").strip()
     fcc_global_enabled = configs.get("fcc_global_enabled", "0") == "1"
     timeshift_enabled_global = configs.get("timeshift_enabled", "1") == "1"
@@ -891,20 +843,17 @@ async def generate_m3u(
         m_url = ch["multicast_url"]
         play_m_url = ""
         if m_url:
-            if m_url.startswith("igmp://"):
+            if m_url.startswith("igmp://") and udpxy_enabled and udpxy_address:
                 raw_addr = m_url[7:]
-                if udpxy_address:
-                    udpxy_clean = udpxy_address.rstrip('/')
-                    if not udpxy_clean.startswith("http://") and not udpxy_clean.startswith("https://"):
-                        udpxy_clean = f"http://{udpxy_clean}"
+                udpxy_clean = udpxy_address.rstrip('/')
+                if not udpxy_clean.startswith("http://") and not udpxy_clean.startswith("https://"):
+                    udpxy_clean = f"http://{udpxy_clean}"
+                
+                fcc_str = ""
+                if fcc_global_enabled and ch["fcc_enabled"] > 0 and ch["fcc_ip"] and ch["fcc_port"]:
+                    fcc_str = f'?fcc={ch["fcc_ip"]}:{ch["fcc_port"]}'
                     
-                    fcc_str = ""
-                    if fcc_global_enabled and ch["fcc_enabled"] > 0 and ch["fcc_ip"] and ch["fcc_port"]:
-                        fcc_str = f'?fcc={ch["fcc_ip"]}:{ch["fcc_port"]}'
-                        
-                    play_m_url = f"{udpxy_clean}/udp/{raw_addr}{fcc_str}"
-                else:
-                    play_m_url = m_url
+                play_m_url = f"{udpxy_clean}/udp/{raw_addr}{fcc_str}"
             else:
                 play_m_url = m_url
                 

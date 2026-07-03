@@ -255,18 +255,11 @@
                         </div>
                         <div class="import-panel-content">
                             <div class="import-options">
-                                <div class="form-group">
-                                    <label>导入格式</label>
-                                    <select v-model="importFormat">
-                                        <option value="m3u">M3U 播放列表 (*.m3u / *.m3u8)</option>
-                                        <option value="csv">CSV 文件 (*.csv)</option>
-                                    </select>
-                                </div>
-                                <div class="import-tabs">
+                                <div class="import-tabs" style="margin-top: 0;">
                                     <button :class="['import-tab-btn', { active: importMethod === 'text' }]" @click="importMethod = 'text'">📋 粘贴文本</button>
                                     <button :class="['import-tab-btn', { active: importMethod === 'file' }]" @click="importMethod = 'file'">📁 上传文件</button>
                                 </div>
-                                <div class="form-actions">
+                                <div class="form-actions" style="margin-top: 15px;">
                                     <button class="btn btn-primary" @click="importExternalChannels" :disabled="importingChannels" style="width: 100%;">
                                         <span class="spinner" v-if="importingChannels"></span>
                                         {{ importingChannels ? '导入中...' : '📥 开始导入' }}
@@ -275,12 +268,12 @@
                             </div>
                             <div class="import-area">
                                 <div v-if="importMethod === 'text'" style="width: 100%;">
-                                    <textarea v-model="importText" placeholder="在此粘贴 M3U 订阅内容或 CSV 频道文本（如：频道名称,组播地址,ID,分类）..." rows="4" class="import-textarea"></textarea>
+                                    <textarea v-model="importText" placeholder="在此粘贴 M3U 订阅内容或 M3U8 播放列表文本..." rows="4" class="import-textarea"></textarea>
                                 </div>
                                 <div v-else style="width: 100%;">
                                     <div class="file-upload-zone" @dragover.prevent @drop.prevent="handleImportFileDrop">
                                         <span class="upload-icon">📥</span>
-                                        <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label">选择文件<input type="file" @change="handleImportFileSelect" accept=".m3u,.m3u8,.csv" style="display:none;"></label></p>
+                                        <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label">选择文件<input type="file" @change="handleImportFileSelect" accept=".m3u,.m3u8" style="display:none;"></label></p>
                                         <p v-else class="text-success" style="font-size: 12px;">已选择文件: <strong>{{ importFile.name }}</strong> <button class="btn-clear-file" @click="importFile = null" style="background:none; border:none; color:var(--color-error); cursor:pointer; font-size:12px;">[清除]</button></p>
                                     </div>
                                 </div>
@@ -481,7 +474,7 @@
                         <div v-if="filteredLogs.length === 0" class="log-empty">暂无相关运行日志</div>
                         <div v-else v-for="(log, idx) in filteredLogs" :key="idx" :class="['log-item', log.level]">
                             <span class="log-time">{{ log.time }}</span>
-                            <span :class="['log-level-badge', log.level]">{{ log.level }}</span>
+                            <span :class="['log-level-text', log.level.toLowerCase()]">{{ log.level }}</span>
                             <span class="log-message">{{ log.message }}</span>
                         </div>
                     </div>
@@ -500,33 +493,30 @@
                         <button class="modal-close" @click="showLiveConfigModal = false">×</button>
                     </div>
                     <div class="modal-body">
-                        <div class="form-group">
-                            <label>udpxy 代理服务地址</label>
-                            <input type="text" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688">
-                            <small class="form-help">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
-                        </div>
-                        <div class="form-group">
-                            <label>EPG XML 地址</label>
-                            <input type="text" v-model="liveConfig.epg_url" placeholder="例如: http://192.168.1.3:6688/epg.xml.gz">
-                            <small class="form-help">将作为 x-tvg-url 写入 M3U 首行头。</small>
-                        </div>
-                        <div class="form-group">
-                            <label>LOGO 基础 URL</label>
-                            <input type="text" v-model="liveConfig.logo_base_url" placeholder="默认为 /static/logo/">
-                            <small class="form-help">用于拼接频道台标地址。若是相对路径，生成 M3U 时会自动拼接当前的网卡 Host 头部。</small>
-                        </div>
-                        
-                        <div class="form-group inline-checkbox-group" style="margin-top: 15px;">
+                        <!-- 开关配置组 -->
+                        <div class="form-group inline-checkbox-group" style="margin-top: 10px; margin-bottom: 15px;">
                             <label class="switch-item">
                                 <label class="switch-toggle">
-                                    <input type="checkbox" v-model="liveConfig.fcc_global_enabled_bool">
+                                    <input type="checkbox" v-model="liveConfig.udpxy_enabled_bool">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label-text">🔗 启用 UDPXY 组播代理模式</span>
+                            </label>
+                            <small class="form-help text-muted">开启后，igmp:// 组播头会被自动转换成 udpxy 的 http:// 代理格式；关闭则保持原始 igmp:// 连接。</small>
+                        </div>
+                        
+                        <div class="form-group inline-checkbox-group" style="margin-bottom: 15px; transition: opacity 0.2s;" :style="{ opacity: liveConfig.udpxy_enabled_bool ? 1 : 0.5, pointerEvents: liveConfig.udpxy_enabled_bool ? 'auto' : 'none' }">
+                            <label class="switch-item">
+                                <label class="switch-toggle">
+                                    <input type="checkbox" v-model="liveConfig.fcc_global_enabled_bool" :disabled="!liveConfig.udpxy_enabled_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">⚡ 启用全局 FCC 加速</span>
                             </label>
-                            <small class="form-help text-muted">开启后，若频道支持 FCC，则在 udpxy 转换链接后追加 ?fcc= 提速参数。</small>
+                            <small class="form-help text-muted">开启后，若频道支持 FCC，则在 udpxy 转换链接后追加 ?fcc= 提速参数。仅在 UDPXY 模式开启时有效。</small>
                         </div>
-                        <div class="form-group inline-checkbox-group">
+                        
+                        <div class="form-group inline-checkbox-group" style="margin-bottom: 15px;">
                             <label class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.timeshift_enabled_bool">
@@ -536,7 +526,8 @@
                             </label>
                             <small class="form-help text-muted">开启后，对支持时移的频道生成 catchup="default" 时移元数据。</small>
                         </div>
-                        <div class="form-group inline-checkbox-group">
+                        
+                        <div class="form-group inline-checkbox-group" style="margin-bottom: 20px;">
                             <label class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.m3u_dual_line_bool">
@@ -545,6 +536,23 @@
                                 <span class="switch-label-text">🛤️ 启用组播+单播双线模式</span>
                             </label>
                             <small class="form-help text-muted">开启后，同一频道将同时生成 udpxy 组播和 RTSP 单播两行数据。</small>
+                        </div>
+
+                        <!-- 文本输入配置组 -->
+                        <div class="form-group" style="margin-bottom: 15px; transition: opacity 0.2s;" :style="{ opacity: liveConfig.udpxy_enabled_bool ? 1 : 0.5, pointerEvents: liveConfig.udpxy_enabled_bool ? 'auto' : 'none' }">
+                            <label>udpxy 代理服务地址</label>
+                            <input type="text" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688" :disabled="!liveConfig.udpxy_enabled_bool">
+                            <small class="form-help">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label>EPG XML 地址</label>
+                            <input type="text" v-model="liveConfig.epg_url" placeholder="例如: http://192.168.1.3:6688/epg.xml.gz">
+                            <small class="form-help">将作为 x-tvg-url 写入 M3U 首行头。</small>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label>LOGO 基础 URL</label>
+                            <input type="text" v-model="liveConfig.logo_base_url" placeholder="默认为 /static/logo/">
+                            <small class="form-help">用于拼接频道台标地址。若是相对路径，生成 M3U 时会自动拼接当前的网卡 Host 头部。</small>
                         </div>
                     </div>
                     <div class="modal-footer">
