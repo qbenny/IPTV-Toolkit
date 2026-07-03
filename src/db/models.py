@@ -171,7 +171,22 @@ def init_db():
         c.execute("""
             INSERT OR IGNORE INTO live_config (key, value)
             VALUES (?, ?)
-        """, (k, v))
+        """,         (k, v))
+
+    # EPG 节目单表
+    c.execute("""CREATE TABLE IF NOT EXISTS epg_programs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id TEXT NOT NULL,
+        channel_name TEXT DEFAULT '', title TEXT DEFAULT '',
+        start_time TEXT NOT NULL, end_time TEXT NOT NULL,
+        program_date TEXT NOT NULL, epg_channel_id TEXT DEFAULT '',
+        raw_data_json TEXT DEFAULT '', synced_at INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT 0)""")
+    c.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_epg_dedup
+        ON epg_programs(channel_id, start_time, title)""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_epg_channel ON epg_programs(channel_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_epg_date ON epg_programs(program_date)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_epg_epg_ch ON epg_programs(epg_channel_id)")
+    c.execute("INSERT OR IGNORE INTO live_config(key,value) VALUES('epg_auto_sync','1')")
 
     conn.commit()
     conn.close()

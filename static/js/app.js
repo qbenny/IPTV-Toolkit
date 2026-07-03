@@ -20,12 +20,14 @@ const app = createApp({
                 stb: '系统凭证配置',
                 sync: '数据同步管理',
                 live: '直播频道管理',
+                epg: 'EPG 节目管理',
                 log: '系统日志'
             },
             tabSubtitles: {
                 stb: '配置电信机顶盒仿真认证参数，保障安全接入 EPG 网关',
                 sync: '从 VIS API 同步点播数据到本地 SQLite 数据库',
                 live: '管理直播频道、分类、外部导入，生成 M3U 订阅',
+                epg: '从 VIS 节目单 API 同步 EPG 数据，生成 XMLTV',
                 log: '查看系统运行日志，支持级别过滤'
             },
 
@@ -82,6 +84,12 @@ const app = createApp({
             selectAllChannels: false,
             tbodyKey: 0,
 
+            // Plate 5: EPG
+            epgSyncStatus: { running: false, progress: '', last_sync_time: null },
+            epgSyncTimer: null,
+            epgStats: { total_programs: 0, total_channels: 0, date_range: null },
+            nowPlaying: [], nowPlayingLoaded: false,
+
             // Plate 3: Log
             logs: [],
             logLevelFilter: 'ALL',
@@ -108,6 +116,9 @@ const app = createApp({
             const origin = window.location.origin;
             return `${origin}/tv.m3u`;
         },
+        epgXmlLink() {
+            return `${window.location.origin}/epg.xml`;
+        },
         canBatchDelete() {
             if (this.selectedChannelIds.length === 0) return false;
             return this.selectedChannelIds.every(id => {
@@ -130,6 +141,9 @@ const app = createApp({
                 this.startSyncStatusPolling();
             } else if (newTab === 'live') {
                 this.initLiveTab();
+            } else if (newTab === 'epg') {
+                this.fetchEpgStats();
+                this.startEpgSyncPolling();
             }
         },
         selectedChannelIds(newVal) {
@@ -322,6 +336,31 @@ const app = createApp({
             if (!ts) return '—';
             return new Date(ts * 1000).toLocaleString('zh-CN');
         },
+
+        // ---- EPG ----
+        async triggerEpgSync() {
+            try { const r = await fetch('/api/epg/sync', { method: 'POST' }); const res = await r.json();
+                if (res.status === 'started') { this.showToast('EPG 同步已启动'); this.startEpgSyncPolling(); }
+                else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.startEpgSyncPolling(); }
+                else this.showToast(res.message || '启动失败', 'error');
+            } catch (e) { this.showToast('通信异常', 'error'); }
+        },
+        async fetchEpgSyncStatus() {
+            try { const r = await fetch('/api/epg/sync/status'); this.epgSyncStatus = await r.json();
+                if (!this.epgSyncStatus.running && this.epgSyncTimer) { clearInterval(this.epgSyncTimer); this.epgSyncTimer = null; if (this.epgSyncStatus.last_sync_time) { this.showToast('EPG 同步完成!'); this.fetchEpgStats(); } }
+            } catch (e) {}
+        },
+        async fetchEpgStats() {
+            try { const r = await fetch('/api/epg/stats'); this.epgStats = await r.json(); } catch (e) {}
+        },
+        startEpgSyncPolling() {
+            this.fetchEpgSyncStatus(); this.fetchEpgStats();
+            if (!this.epgSyncTimer) this.epgSyncTimer = setInterval(() => this.fetchEpgSyncStatus(), 2000);
+        },
+        async fetchNowPlaying() {
+            try { const r = await fetch('/api/epg/programs/now'); const data = await r.json(); this.nowPlaying = data.items || []; this.nowPlayingLoaded = true; } catch (e) {}
+        },
+        copyEpgXmlLink() { this.copyToClipboard(this.epgXmlLink); },
 
         // ---- Log ----
         async fetchLogs() {
