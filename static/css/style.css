@@ -371,6 +371,10 @@ body {
     cursor: pointer;
     font-size: 15px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
 .checkbox-label input {
@@ -474,6 +478,10 @@ body {
 .status-val {
     font-size: 15px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
 .status-val.highlight {
@@ -1213,6 +1221,10 @@ body {
     color: var(--color-error);
     font-size: 13px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
 .modal-footer {
@@ -1950,6 +1962,10 @@ body {
     font-size: 13px;
     cursor: pointer;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
 .category-add-inline {
@@ -1974,23 +1990,60 @@ body {
     background: rgba(255, 255, 255, 0.8);
 }
 
-.color-picker-wrapper {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
+.color-picker-row {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
 }
 
-.color-picker-wrapper input[type="color"] {
-    border: none;
-    padding: 0;
-    width: 50px;
-    height: 50px;
-    margin-left: -9px;
-    margin-top: -9px;
-    cursor: pointer;
+.color-picker-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
 }
+
+.color-picker-popup {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 6px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+    width: 140px;
+}
+
+.color-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: #666;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.color-dot:hover {
+    transform: scale(1.3);
+}
+
+.color-picker-popup .color-dot {
+    width: 16px;
+    height: 16px;
+}
+
+
 
 .category-list-container {
     max-height: 300px;
@@ -2209,6 +2262,60 @@ body {
 
 .batch-cat-select:focus {
     border-color: var(--color-primary);
+}
+
+.cat-select {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 4px 8px;
+    border-radius: 6px;
+    outline: none;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    min-width: 80px;
+    max-width: 110px;
+}
+
+[data-theme="light"] .cat-select {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.cat-select:focus {
+    border-color: var(--color-primary);
+}
+
+.channel-name-cell {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 160px;
+}
+
+.channel-name-cell.clickable {
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-bottom: 1px dashed var(--border-color);
+    max-width: 100px;
+}
+
+.channel-name-cell.clickable:hover {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.channel-tag {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 4px;
+    padding: 1px 4px;
+    font-size: 9px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
 }
 
 .row-actions {

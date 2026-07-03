@@ -8,6 +8,7 @@ import os
 from typing import Optional, List
 from src.db.models import get_db_connection
 from src.utils.logger import logger
+from src.utils.normalize import normalize_epg, normalize_logo
 
 router = APIRouter(prefix="/api/live", tags=["live"])
 
@@ -32,6 +33,54 @@ def get_live_configs() -> dict:
     rows = c.fetchall()
     conn.close()
     return {row["key"]: row["value"] for row in rows}
+
+
+def get_alias_map() -> dict:
+    """获取频道别名映射表，返回 {source_name: target_name} 字典。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT source_name, target_name FROM live_channel_aliases")
+    rows = c.fetchall()
+    conn.close()
+    return {row["source_name"]: row["target_name"] for row in rows}
+
+
+def resolve_channel_names(source_name: str, alias_map: dict = None) -> dict:
+    """解析频道各项名称字段。
+
+    Args:
+        source_name: 服务器原始频道名
+        alias_map: 别名映射表 {source_name: target_name}，可选
+
+    Returns:
+        {
+            "name": str,          # 原始名称（存档）
+            "display_name": str,  # 显示名称
+            "tvg_id": str,        # EPG 匹配 ID
+            "tvg_name": str,      # EPG 匹配名
+            "logo_url": str,      # Logo 文件名
+        }
+    """
+    if alias_map is None:
+        alias_map = {}
+
+    # 查映射表
+    target = alias_map.get(source_name)
+
+    # display_name：映射命中用 target，未命中用原始 name
+    display_name = target if target else source_name
+
+    # 归一化计算 tvg_id / tvg_name / logo_url
+    base_epg = normalize_epg(display_name)
+    base_logo = normalize_logo(display_name)
+
+    return {
+        "name": source_name,
+        "display_name": display_name,
+        "tvg_id": base_epg,
+        "tvg_name": base_epg,
+        "logo_url": base_logo + ".png",
+    }
 
 
 def parse_m3u_content(content: str) -> list:
@@ -123,6 +172,7 @@ async def sync_channels():
             return {"status": "success", "count": 0, "disabled": 0, "message": "同步完成，未发现可用频道"}
             
         sync_time = int(time.time())
+        alias_map = get_alias_map()
         conn = get_db_connection()
         c = conn.cursor()
         
@@ -196,16 +246,17 @@ async def sync_channels():
                 ))
                 updated_count += 1
             else:
+                resolved = resolve_channel_names(ch["name"], alias_map)
                 c.execute("""
                     INSERT INTO live_channels (
-                        source, channel_id, user_channel_id, name,
+                        source, channel_id, user_channel_id, name, display_name,
                         tvg_id, tvg_name, logo_url, category_id, sort_index, is_enabled,
                         multicast_url, unicast_url, unicast_url_full, timeshift_enabled,
                         timeshift_length, timeshift_url, is_hd, channel_type, channel_sdp,
                         channel_url_raw, channel_locked, preview_enabled, fcc_enabled,
                         fcc_ip, fcc_port, fec_port, raw_fields_json, synced_at, created_at
                     ) VALUES (
-                        'server', ?, ?, ?,
+                        'server', ?, ?, ?, ?,
                         ?, ?, ?, 0, 0, 1,
                         ?, ?, ?, ?,
                         ?, ?, ?, ?, ?,
@@ -215,10 +266,11 @@ async def sync_channels():
                 """, (
                     channel_id,
                     ch["user_channel_id"],
-                    ch["name"],
-                    ch["name"],
-                    ch["name"],
-                    ch["name"] + ".png",
+                    resolved["name"],
+                    resolved["display_name"],
+                    resolved["tvg_id"],
+                    resolved["tvg_name"],
+                    resolved["logo_url"],
                     ch["multicast_url"],
                     ch["unicast_url"],
                     ch["unicast_url_full"],
@@ -303,7 +355,7 @@ async def get_channels(
     total = c.fetchone()["total"]
     
     query = f"""
-        SELECT c.*, cat.name as category_name 
+        SELECT c.*, cat.name as category_name, cat.color as category_color 
         FROM live_channels c
         LEFT JOIN live_categories cat ON c.category_id = cat.id
         {where_str}
@@ -437,10 +489,12 @@ async def add_channel(ch_data: dict):
         if c.fetchone():
             conn.close()
             raise HTTPException(status_code=400, detail="该组播地址已存在")
-            
-    tvg_id = ch_data.get("tvg_id", name) or name
-    tvg_name = ch_data.get("tvg_name", name) or name
-    logo_url = ch_data.get("logo_url", "")
+    
+    # 名称解析
+    display_name = ch_data.get("display_name", "").strip() or name
+    tvg_id = ch_data.get("tvg_id", "").strip() or normalize_epg(display_name)
+    tvg_name = ch_data.get("tvg_name", "").strip() or normalize_epg(display_name)
+    logo_url = ch_data.get("logo_url", "").strip() or normalize_logo(display_name) + ".png"
     category_id = int(ch_data.get("category_id", 0))
     sort_index = int(ch_data.get("sort_index", 0))
     is_enabled = int(ch_data.get("is_enabled", 1))
@@ -448,11 +502,11 @@ async def add_channel(ch_data: dict):
     now = int(time.time())
     c.execute("""
         INSERT INTO live_channels (
-            source, channel_id, user_channel_id, name,
+            source, channel_id, user_channel_id, name, display_name,
             tvg_id, tvg_name, logo_url, category_id, sort_index, is_enabled,
             multicast_url, unicast_url, synced_at, created_at
         ) VALUES (
-            'external', ?, ?, ?,
+            'external', ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?
         )
@@ -460,6 +514,7 @@ async def add_channel(ch_data: dict):
         channel_id,
         ch_data.get("user_channel_id", ""),
         name,
+        display_name,
         tvg_id,
         tvg_name,
         logo_url,
@@ -491,44 +546,41 @@ async def update_channel(id: int, ch_data: dict):
         raise HTTPException(status_code=404, detail="频道不存在")
         
     source = row["source"]
-    name = ch_data.get("name", "").strip()
-    if not name:
-        conn.close()
-        raise HTTPException(status_code=400, detail="频道名称不能为空")
-        
     category_id = int(ch_data.get("category_id", 0))
     sort_index = int(ch_data.get("sort_index", 0))
     is_enabled = int(ch_data.get("is_enabled", 1))
-    tvg_id = ch_data.get("tvg_id", name) or name
-    tvg_name = ch_data.get("tvg_name", name) or name
-    logo_url = ch_data.get("logo_url", "")
+    tvg_id = ch_data.get("tvg_id", "").strip()
+    tvg_name = ch_data.get("tvg_name", "").strip()
+    logo_url = ch_data.get("logo_url", "").strip()
     
     if source == 'external':
+        name = ch_data.get("name", "").strip()
+        if not name:
+            conn.close()
+            raise HTTPException(status_code=400, detail="频道名称不能为空")
+        display_name = ch_data.get("display_name", "").strip() or name
         multicast_url = ch_data.get("multicast_url", "")
         unicast_url = ch_data.get("unicast_url", "")
         channel_id = ch_data.get("channel_id", "")
         user_channel_id = ch_data.get("user_channel_id", "")
         c.execute("""
             UPDATE live_channels SET
-                name = ?, tvg_id = ?, tvg_name = ?, logo_url = ?,
+                name = ?, display_name = ?, tvg_id = ?, tvg_name = ?, logo_url = ?,
                 category_id = ?, sort_index = ?, is_enabled = ?,
                 multicast_url = ?, unicast_url = ?, channel_id = ?, user_channel_id = ?
             WHERE id = ?
         """, (
-            name, tvg_id, tvg_name, logo_url,
+            name, display_name, tvg_id, tvg_name, logo_url,
             category_id, sort_index, is_enabled,
             multicast_url, unicast_url, channel_id, user_channel_id, id
         ))
     else:
+        # server 频道：仅分类可手动改，其余全部由服务器/映射表/归一化自动生成
         c.execute("""
             UPDATE live_channels SET
-                name = ?, tvg_id = ?, tvg_name = ?, logo_url = ?,
                 category_id = ?, sort_index = ?, is_enabled = ?
             WHERE id = ?
-        """, (
-            name, tvg_id, tvg_name, logo_url,
-            category_id, sort_index, is_enabled, id
-        ))
+        """, (category_id, sort_index, is_enabled, id))
         
     conn.commit()
     conn.close()
@@ -657,6 +709,21 @@ async def delete_category(id: int):
     return {"status": "success"}
 
 
+@router.post("/categories/reorder")
+async def reorder_categories(payload: dict):
+    """批量更新分类排序。"""
+    orders = payload.get("order", [])
+    if not orders:
+        return {"status": "success"}
+    conn = get_db_connection()
+    c = conn.cursor()
+    for item in orders:
+        c.execute("UPDATE live_categories SET sort_index = ? WHERE id = ?", (item["sort_index"], item["id"]))
+    conn.commit()
+    conn.close()
+    return {"status": "success"}
+
+
 @router.post("/import")
 async def import_channels(
     request: Request,
@@ -694,13 +761,41 @@ async def import_channels(
     c.execute("SELECT id, name FROM live_categories")
     cat_rows = c.fetchall()
     cat_map = {row["name"]: row["id"] for row in cat_rows}
-    
+
+    def resolve_category(group_title: str) -> int:
+        """智能匹配分类：精确 → 部分匹配 → 自动创建 → 未分类"""
+        if not group_title:
+            return 0
+        if group_title in cat_map:
+            return cat_map[group_title]
+        for name, cid in cat_map.items():
+            if group_title in name or name in group_title:
+                return cid
+        now = int(time.time())
+        c.execute("INSERT INTO live_categories (name, sort_index, created_at) VALUES (?, 99, ?)", (group_title, now))
+        new_id = c.lastrowid
+        cat_map[group_title] = new_id
+        logger.info(f"[Import] 自动创建分类: {group_title}")
+        return new_id
+
     new_count = 0
     skipped_count = 0
+    not_multicast = 0
     now = int(time.time())
-    
+
+    def normalize_multicast_url(url: str) -> str | None:
+        """将导入地址标准化为组播格式，非组播返回 None"""
+        if not url:
+            return None
+        if url.startswith("igmp://") or url.startswith("rtp://"):
+            return url
+        m = re.match(r'https?://[^/]+/udp/([\d]+\.[\d]+\.[\d]+\.[\d]+:\d+)', url)
+        if m:
+            return "igmp://" + m.group(1)
+        return None
+
     for item in imported_list:
-        ch_id = item.get("channel_id", "").strip()
+        ch_id = "999999"  # 外部导入频道统一 channel_id
         url = item.get("url", "").strip()
         name = item.get("name", "").strip()
         group_title = item.get("group_title", "").strip()
@@ -708,44 +803,47 @@ async def import_channels(
         if not name or not url:
             skipped_count += 1
             continue
+
+        # 标准化组播地址，非组播跳过
+        mcast_url = normalize_multicast_url(url)
+        if not mcast_url:
+            not_multicast += 1
+            continue
             
         is_duplicate = False
-        if ch_id and ch_id in existing_ids:
-            is_duplicate = True
-        if url and url in existing_multicast:
+        if mcast_url and mcast_url in existing_multicast:
             is_duplicate = True
             
         if is_duplicate:
             skipped_count += 1
             continue
             
-        category_id = cat_map.get(group_title, 0)
+        category_id = resolve_category(group_title)
         tvg_id = item.get("tvg_id", name) or name
         tvg_name = item.get("tvg_name", name) or name
         logo_url = item.get("logo_url", "")
+        display_name = name
         
         if logo_url:
             logo_url = os.path.basename(logo_url)
             
         c.execute("""
             INSERT INTO live_channels (
-                source, channel_id, name, tvg_id, tvg_name, logo_url,
+                source, channel_id, name, display_name, tvg_id, tvg_name, logo_url,
                 category_id, sort_index, is_enabled, multicast_url,
                 synced_at, created_at
             ) VALUES (
-                'external', ?, ?, ?, ?, ?,
+                'external', ?, ?, ?, ?, ?, ?,
                 ?, 0, 1, ?,
                 ?, ?
             )
         """, (
-            ch_id, name, tvg_id, tvg_name, logo_url,
-            category_id, url, now, now
+            ch_id, name, display_name, tvg_id, tvg_name, logo_url,
+            category_id, mcast_url, now, now
         ))
         
-        if ch_id:
-            existing_ids.add(ch_id)
-        if url:
-            existing_multicast.add(url)
+        if mcast_url:
+            existing_multicast.add(mcast_url)
             
         new_count += 1
         
@@ -755,8 +853,215 @@ async def import_channels(
     return {
         "new": new_count,
         "skipped": skipped_count,
+        "not_multicast": not_multicast,
         "total": len(imported_list)
     }
+
+
+# ---- 频道别名映射表 API ----
+
+
+def _apply_alias_to_channels(c, source_name: str, target_name: str) -> int:
+    """将单条别名映射应用到匹配的已有频道上。
+
+    Args:
+        c: 数据库 cursor
+        source_name: 服务器原始名称
+        target_name: 规范名称
+
+    Returns:
+        受影响的频道数量
+    """
+    display_name = target_name
+    base_epg = normalize_epg(target_name)
+    base_logo = normalize_logo(target_name)
+
+    c.execute("""
+        UPDATE live_channels
+        SET display_name = ?, tvg_id = ?, tvg_name = ?, logo_url = ?
+        WHERE name = ? AND source = 'server'
+    """, (display_name, base_epg, base_epg, base_logo + ".png", source_name))
+    return c.rowcount
+
+
+def _reapply_all_aliases(c) -> dict:
+    """将别名映射表中的所有映射应用到已有频道。
+
+    Returns:
+        {"applied": int, "affected": int}
+        applied: 成功应用的别名数
+        affected: 被更新的频道数
+    """
+    c.execute("SELECT source_name, target_name FROM live_channel_aliases")
+    aliases = c.fetchall()
+    total_affected = 0
+    applied = 0
+    for row in aliases:
+        n = _apply_alias_to_channels(c, row["source_name"], row["target_name"])
+        if n > 0:
+            total_affected += n
+            applied += 1
+    return {"applied": applied, "affected": total_affected}
+
+
+@router.get("/aliases")
+async def get_aliases():
+    """获取所有频道别名映射。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, source_name, target_name FROM live_channel_aliases ORDER BY id ASC")
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+@router.post("/aliases")
+async def add_alias(data: dict):
+    """添加单条别名映射（自动应用到已有频道）。"""
+    source_name = data.get("source_name", "").strip()
+    target_name = data.get("target_name", "").strip()
+    if not source_name or not target_name:
+        raise HTTPException(status_code=400, detail="source_name 和 target_name 不能为空")
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute(
+            "INSERT OR REPLACE INTO live_channel_aliases (source_name, target_name) VALUES (?, ?)",
+            (source_name, target_name)
+        )
+        affected = _apply_alias_to_channels(c, source_name, target_name)
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"保存失败: {e}")
+    conn.close()
+    return {"status": "success", "affected_channels": affected}
+
+
+@router.put("/aliases/{id}")
+async def update_alias(id: int, data: dict):
+    """更新别名映射（自动应用到已有频道）。"""
+    source_name = data.get("source_name", "").strip()
+    target_name = data.get("target_name", "").strip()
+    if not source_name or not target_name:
+        raise HTTPException(status_code=400, detail="source_name 和 target_name 不能为空")
+
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # 取出旧值
+    c.execute("SELECT source_name FROM live_channel_aliases WHERE id = ?", (id,))
+    old_row = c.fetchone()
+    old_source = old_row["source_name"] if old_row else ""
+
+    c.execute(
+        "UPDATE live_channel_aliases SET source_name = ?, target_name = ? WHERE id = ?",
+        (source_name, target_name, id)
+    )
+
+    # 如果原名改了，旧名的频道回退为原始值
+    if old_source and old_source != source_name:
+        c.execute(
+            "UPDATE live_channels SET display_name = name WHERE name = ? AND source = 'server'",
+            (old_source,)
+        )
+
+    affected = _apply_alias_to_channels(c, source_name, target_name)
+    conn.commit()
+    conn.close()
+    return {"status": "success", "affected_channels": affected}
+
+
+@router.delete("/aliases/{id}")
+async def delete_alias(id: int):
+    """删除别名映射（同时回退相关频道的显示名称）。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # 查出 source_name 用于回退
+    c.execute("SELECT source_name FROM live_channel_aliases WHERE id = ?", (id,))
+    row = c.fetchone()
+    source_name = row["source_name"] if row else ""
+
+    c.execute("DELETE FROM live_channel_aliases WHERE id = ?", (id,))
+
+    # 回退匹配频道的 display_name 为原始 name
+    if source_name:
+        c.execute(
+            "UPDATE live_channels SET display_name = name WHERE name = ? AND source = 'server'",
+            (source_name,)
+        )
+
+    conn.commit()
+    conn.close()
+    return {"status": "success"}
+
+
+@router.get("/aliases/export")
+async def export_aliases():
+    """导出别名映射表为 JSON。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT source_name, target_name FROM live_channel_aliases ORDER BY id ASC")
+    rows = c.fetchall()
+    conn.close()
+
+    aliases = [{"source_name": r["source_name"], "target_name": r["target_name"]} for r in rows]
+    return {
+        "version": 1,
+        "exported_at": int(time.time()),
+        "count": len(aliases),
+        "aliases": aliases
+    }
+
+
+@router.post("/aliases/import")
+async def import_aliases(data: dict):
+    """从 JSON 导入别名映射表（覆盖模式：清空后插入，并全部应用到频道）。"""
+    aliases = data.get("aliases", [])
+    if not aliases:
+        raise HTTPException(status_code=400, detail="aliases 列表不能为空")
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("DELETE FROM live_channel_aliases")
+        imported = 0
+        for item in aliases:
+            src = item.get("source_name", "").strip()
+            tgt = item.get("target_name", "").strip()
+            if src and tgt:
+                c.execute(
+                    "INSERT INTO live_channel_aliases (source_name, target_name) VALUES (?, ?)",
+                    (src, tgt)
+                )
+                imported += 1
+        # 导入后全部应用到已有频道
+        reapply_result = _reapply_all_aliases(c)
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"导入失败: {e}")
+    conn.close()
+    return {
+        "status": "success",
+        "imported": imported,
+        "applied": reapply_result["applied"],
+        "affected_channels": reapply_result["affected"]
+    }
+
+
+@router.post("/aliases/reapply")
+async def reapply_aliases():
+    """重新将所有别名映射应用到已有频道。"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    result = _reapply_all_aliases(c)
+    conn.commit()
+    conn.close()
+    logger.info(f"[Alias] 重新应用完成：{result['applied']} 条映射，{result['affected']} 个频道")
+    return {"status": "success", "applied": result["applied"], "affected": result["affected"]}
 
 
 @router.get("/tv.m3u")
@@ -824,8 +1129,9 @@ async def generate_m3u(
 
     for ch in channels:
         name = ch["name"]
-        tvg_id = ch["tvg_id"] or name
-        tvg_name = ch["tvg_name"] or name
+        display_name = ch["display_name"] or name
+        tvg_id = ch["tvg_id"] or normalize_epg(display_name)
+        tvg_name = ch["tvg_name"] or normalize_epg(display_name)
         logo_file = ch["logo_url"]
         logo_full = resolve_logo(logo_file)
         
@@ -838,7 +1144,7 @@ async def generate_m3u(
             
         logo_str = f' tvg-logo="{logo_full}"' if logo_full else ""
         
-        extinf = f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{tvg_name}"{logo_str} group-title="{group}"{catchup_str},{name}'
+        extinf = f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{tvg_name}"{logo_str} group-title="{group}"{catchup_str},{display_name}'
         
         m_url = ch["multicast_url"]
         play_m_url = ""

@@ -82,6 +82,7 @@ def init_db():
             channel_id        TEXT NOT NULL DEFAULT '',
             user_channel_id   TEXT DEFAULT '',
             name              TEXT DEFAULT '',
+            display_name      TEXT DEFAULT '',
             tvg_id            TEXT DEFAULT '',
             tvg_name          TEXT DEFAULT '',
             logo_url          TEXT DEFAULT '',
@@ -117,6 +118,23 @@ def init_db():
             value TEXT DEFAULT ''
         )
     """)
+
+    # 频道别名映射表
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS live_channel_aliases (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_name TEXT UNIQUE NOT NULL,
+            target_name TEXT NOT NULL
+        )
+    """)
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_alias_source ON live_channel_aliases(source_name)")
+
+    # 数据库迁移：为旧库添加 display_name 列
+    try:
+        c.execute("SELECT display_name FROM live_channels LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE live_channels ADD COLUMN display_name TEXT DEFAULT ''")
+        logger.info("[DB] 迁移：已添加 live_channels.display_name 列")
 
     # 直播索引
     c.execute("CREATE INDEX IF NOT EXISTS idx_live_source ON live_channels(source)")
