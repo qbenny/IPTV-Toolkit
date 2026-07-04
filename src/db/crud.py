@@ -218,9 +218,17 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
             sql += " AND year = ?"
             params.append(year_val)
 
-    if filters.get("isfinished"):
-        sql += " AND isFinished = ?"
-        params.append(int(filters["isfinished"]))
+    if filters.get("quality"):
+        q = filters["quality"]
+        if q == "SD":
+            # SD = 普通版，标题不含 HD 和 4K
+            sql += " AND title NOT LIKE ? AND title NOT LIKE ?"
+            params.append("%HD%")
+            params.append("%4K%")
+        else:
+            # HD 或 4K
+            sql += " AND title LIKE ?"
+            params.append(f"%{q}%")
 
     # Count
     c.execute(sql, params)

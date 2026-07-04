@@ -8,12 +8,19 @@ from src.utils.logger import logger
 
 # 模拟器实例引用（在 main.py 启动时注入）
 _simulator = None
+_login_func = lambda: None
 
 
 def set_simulator(sim):
     """设置全局模拟器实例（在 main.py 启动时调用）。"""
     global _simulator
     _simulator = sim
+
+
+def set_login_func(login_fn):
+    """设置全局登录回调函数。"""
+    global _login_func
+    _login_func = login_fn
 
 
 def get_simulator():
@@ -71,7 +78,7 @@ async def play_redirect(request: Request, vod_id: str = None, url: str = None, v
     if vod_id and sim:
         try:
             from src.auth.heartbeat import ensure_authenticated
-            ensure_authenticated(sim, lambda: None)
+            ensure_authenticated(sim, _login_func)
             media_url = sim.get_vod_play_url(vod_id)
             if media_url:
                 target_url = media_url.split("?")[0]

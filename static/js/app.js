@@ -90,6 +90,14 @@ const app = createApp({
             epgStats: { total_programs: 0, total_channels: 0, date_range: null },
             nowPlaying: [], nowPlayingLoaded: false,
 
+            // EPG Preview Modal
+            showEpgPreviewModal: false,
+            epgPreviewChannel: null,
+            epgPreviewDates: [],
+            epgPreviewDateIndex: 0,
+            epgLoading: false,
+            epgPrograms: [],
+
             // Plate 3: Log
             logs: [],
             logLevelFilter: 'ALL',
@@ -125,6 +133,11 @@ const app = createApp({
                 const ch = this.liveChannels.find(c => c.id === id);
                 return ch && ch.source === 'external';
             });
+        },
+        epgFormattedDate() {
+            if (this.epgPreviewDates.length === 0 || this.epgPreviewDateIndex < 0 || this.epgPreviewDateIndex >= this.epgPreviewDates.length) return '';
+            const dateStr = this.epgPreviewDates[this.epgPreviewDateIndex];
+            return this.formatEpgDateLabel(dateStr);
         }
     },
 
@@ -197,6 +210,156 @@ const app = createApp({
             this.theme = n;
             localStorage.setItem('theme', n);
             document.documentElement.setAttribute('data-theme', n);
+        },
+
+        // ---- EPG Preview Modal Methods ----
+        openEpgPreview(ch) {
+            this.epgPreviewChannel = ch;
+            this.showEpgPreviewModal = true;
+            this.epgPrograms = [];
+            
+            // Calculate selectable dates: always show full range of past 7 days to tomorrow
+            const dates = [];
+            const backTime = 7;
+            const now = new Date();
+            
+            // Get dates list
+            for (let i = -backTime; i <= 1; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                dates.push(`${year}-${month}-${day}`);
+            }
+            this.epgPreviewDates = dates;
+            // Default select today (index is backTime)
+            this.epgPreviewDateIndex = backTime;
+            
+            this.fetchEpgPrograms();
+        },
+
+        async fetchEpgPrograms() {
+            if (!this.epgPreviewChannel) return;
+            this.epgLoading = true;
+            this.epgPrograms = [];
+            const dateStr = this.epgPreviewDates[this.epgPreviewDateIndex];
+            const channelId = this.epgPreviewChannel.tvg_id || this.epgPreviewChannel.channel_id || this.epgPreviewChannel.name;
+            
+            try {
+                const url = `/api/epg/programs?channel_id=${encodeURIComponent(channelId)}&date=${dateStr}&limit=200`;
+                const r = await fetch(url);
+                if (r.ok) {
+                    const data = await r.json();
+                    this.epgPrograms = data.items || [];
+                    
+                    // Auto scroll to playing program after DOM updates
+                    this.$nextTick(() => {
+                        this.scrollToPlayingProgram();
+                    });
+                }
+            } catch (e) {
+                console.error("加载节目单失败:", e);
+            } finally {
+                this.epgLoading = false;
+            }
+        },
+
+        prevEpgDay() {
+            if (this.epgPreviewDateIndex > 0) {
+                this.epgPreviewDateIndex--;
+                this.fetchEpgPrograms();
+            }
+        },
+
+        nextEpgDay() {
+            if (this.epgPreviewDateIndex < this.epgPreviewDates.length - 1) {
+                this.epgPreviewDateIndex++;
+                this.fetchEpgPrograms();
+            }
+        },
+
+        isProgramPlaying(prog) {
+            if (!prog.start_time || !prog.end_time) return false;
+            try {
+                // Parse "YYYY-MM-DD HH:MM:SS" manually to avoid browser TZ/DST discrepancies
+                const parseDate = (str) => {
+                    const parts = str.split(' ');
+                    const ymd = parts[0].split('-');
+                    const hms = parts[1].split(':');
+                    return new Date(ymd[0], ymd[1] - 1, ymd[2], hms[0], hms[1], hms[2]);
+                };
+                const start = parseDate(prog.start_time);
+                const end = parseDate(prog.end_time);
+                const now = new Date();
+                return now >= start && now <= end;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        formatProgTimeRange(prog) {
+            if (!prog.start_time || !prog.end_time) return '';
+            try {
+                const getHM = (str) => {
+                    const timePart = str.split(' ')[1];
+                    const parts = timePart.split(':');
+                    return `${parts[0]}:${parts[1]}`;
+                };
+                return `${getHM(prog.start_time)} - ${getHM(prog.end_time)}`;
+            } catch (e) {
+                return '';
+            }
+        },
+
+        formatEpgDateLabel(dateStr) {
+            if (!dateStr) return '';
+            try {
+                const parts = dateStr.split('-');
+                const targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const diffTime = targetDate - today;
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                
+                let rel = '';
+                if (diffDays === 0) rel = '今天';
+                else if (diffDays === -1) rel = '昨天';
+                else if (diffDays === 1) rel = '明天';
+                else {
+                    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                    rel = weekdays[targetDate.getDay()];
+                }
+                return `${parts[1]}月${parts[2]}日 (${rel})`;
+            } catch (e) {
+                return dateStr;
+            }
+        },
+
+        scrollToPlayingProgram() {
+            setTimeout(() => {
+                const container = this.$refs.epgProgramList;
+                const rows = this.$refs.epgRows;
+                if (container && rows && rows.length > 0) {
+                    // Find the DOM element that corresponds to the currently playing program
+                    const playingEl = rows.find((el, index) => {
+                        const prog = this.epgPrograms[index];
+                        return prog && this.isProgramPlaying(prog);
+                    });
+                    if (playingEl) {
+                        const containerHeight = container.clientHeight;
+                        const containerRect = container.getBoundingClientRect();
+                        const elRect = playingEl.getBoundingClientRect();
+                        
+                        // Calculate exact offset relative to container's client area
+                        const elTop = elRect.top - containerRect.top + container.scrollTop;
+                        const elHeight = elRect.height || playingEl.clientHeight;
+                        
+                        // Center the element
+                        container.scrollTop = elTop - (containerHeight / 2) + (elHeight / 2);
+                    }
+                }
+            }, 150);
         },
 
         // ---- Toast ----

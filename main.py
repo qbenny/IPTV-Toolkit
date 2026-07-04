@@ -99,14 +99,16 @@ def _start_heartbeat():
 
 # ---- 注入实例到各模块 ----
 
-from src.api.tvbox import set_simulator as set_sim_tvbox
-from src.api.play import set_simulator as set_sim_play
+from src.api.tvbox import set_simulator as set_sim_tvbox, set_login_func as set_login_tvbox
+from src.api.play import set_simulator as set_sim_play, set_login_func as set_login_play
 from src.web.routes import set_simulator as set_sim_web, set_login_func
 from src.api.live import set_simulator as set_sim_live, set_login_func as set_login_live
 from src.api.epg import set_simulator as set_sim_epg, set_login_func as set_login_epg
 
 set_sim_tvbox(sim)
+set_login_tvbox(login_sim)
 set_sim_play(sim)
+set_login_play(login_sim)
 set_sim_web(sim)
 set_login_func(login_sim)
 set_sim_live(sim)

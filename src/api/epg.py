@@ -74,16 +74,29 @@ async def get_xmltv():
     """)
     channels = c.fetchall()
 
-    # 获取从今天开始的节目（按 EPG channel + 时间 + 标题去重，避免 HD/SD 重复）
-    today = datetime.now().strftime("%Y-%m-%d 00:00:00")
+    # 获取频道的 back_time 配置映射（以 tvg_id 为键，取该 ID 下最大 back_time，默认 0）
+    c.execute("""
+        SELECT tvg_id, MAX(back_time) as max_back_time
+        FROM live_channels
+        WHERE tvg_id != '' AND is_enabled = 1
+        GROUP BY tvg_id
+    """)
+    back_time_map = {row["tvg_id"]: (row["max_back_time"] or 0) for row in c.fetchall()}
+
+    # 获取从过去 7 天开始的所有节目（所有频道的最大数据范围，后面在 Python 中做动态裁剪）
+    seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d 00:00:00")
     c.execute("""
         SELECT epg_channel_id, title, start_time, end_time
         FROM epg_programs
         WHERE end_time >= ?
         GROUP BY epg_channel_id, start_time, title
         ORDER BY epg_channel_id, start_time
-    """, (today,))
+    """, (seven_days_ago,))
     programs = c.fetchall()
+
+    # 计算今天开始的绝对时刻（今天 00:00:00）
+    now_dt = datetime.now()
+    today_start = datetime(now_dt.year, now_dt.month, now_dt.day)
 
     # 组装 XML
     xml_parts = [
@@ -108,8 +121,22 @@ async def get_xmltv():
     for prog in programs:
         ch_id = prog["epg_channel_id"]
         title = prog["title"]
-        start = _format_xmltv_time(prog["start_time"])
-        end = _format_xmltv_time(prog["end_time"])
+        start_time_str = prog["start_time"]
+        end_time_str = prog["end_time"]
+
+        # 根据该频道的 back_time 进行动态天数剪裁
+        back_days = back_time_map.get(ch_id, 0)
+        try:
+            prog_end_dt = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            continue
+
+        cutoff_dt = today_start - timedelta(days=back_days)
+        if prog_end_dt < cutoff_dt:
+            continue
+
+        start = _format_xmltv_time(start_time_str)
+        end = _format_xmltv_time(end_time_str)
         if not start or not end:
             continue
         xml_parts.append(f'  <programme channel="{_xml_escape(ch_id)}" start="{start}" stop="{end}">')
@@ -144,8 +171,8 @@ async def query_programs(
     params = []
 
     if channel_id:
-        where_clauses.append("channel_id = ?")
-        params.append(channel_id)
+        where_clauses.append("(channel_id = ? OR epg_channel_id = ?)")
+        params.extend([channel_id, channel_id])
     if date:
         where_clauses.append("program_date = ?")
         params.append(date)
@@ -155,15 +182,16 @@ async def query_programs(
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
-    # 计数
-    c.execute(f"SELECT COUNT(*) FROM epg_programs WHERE {where_sql}", params)
+    # 计数（按 epg_channel_id 和 start_time 去重）
+    c.execute(f"SELECT COUNT(DISTINCT epg_channel_id || '_' || start_time) FROM epg_programs WHERE {where_sql}", params)
     total = c.fetchone()[0]
 
-    # 分页查询
+    # 分页查询（按 epg_channel_id 和 start_time 去重，避免多画质版本重复显示数据）
     offset = (page - 1) * limit
     c.execute(f"""
         SELECT id, channel_id, channel_name, title, start_time, end_time, program_date
         FROM epg_programs WHERE {where_sql}
+        GROUP BY epg_channel_id, start_time
         ORDER BY start_time
         LIMIT ? OFFSET ?
     """, params + [limit, offset])
