@@ -71,6 +71,13 @@
                             <button class="api-copy-btn" @click="copyToClipboard(liveM3uUrl)" title="复制 M3U 订阅链接">📋</button>
                         </div>
                     </div>
+                    <div v-else-if="activeTab === 'epg'" class="api-links-panel" key="epg">
+                        <div class="api-link-item">
+                            <span class="api-link-label">📅 EPG 地址</span>
+                            <code class="api-link-url" :title="epgXmlLink">{{ epgXmlLink }}</code>
+                            <button class="api-copy-btn" @click="copyToClipboard(epgXmlLink)" title="复制 EPG 地址">📋</button>
+                        </div>
+                    </div>
                 </transition>
             </header>
 
@@ -471,8 +478,11 @@
                             <div class="status-item" v-if="epgSyncStatus.running"><span class="status-label">进度</span><span class="status-val highlight">{{ epgSyncStatus.progress }}</span></div>
                             <div class="status-item" v-if="epgSyncStatus.last_sync_time"><span class="status-label">上次同步</span><span class="status-val">{{ formatTime(epgSyncStatus.last_sync_time) }}</span></div>
                         </div>
-                        <div class="form-actions" style="margin-top:20px;display:flex;gap:10px;"><button class="btn btn-primary" @click="triggerEpgSync" :disabled="epgSyncStatus.running||!simStatus.is_authenticated" style="flex:1;">{{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}</button><button class="btn btn-secondary" @click="copyEpgXmlLink">复制 EPG 地址</button></div>
-                        <small v-if="epgXmlLink" style="display:block;margin-top:8px;word-break:break-all;color:var(--text-muted);">{{ epgXmlLink }}</small>
+                        <div class="form-actions" style="margin-top:20px;">
+                            <button class="btn btn-primary" @click="triggerEpgSync" :disabled="epgSyncStatus.running||!simStatus.is_authenticated" style="width: 100%;">
+                                {{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}
+                            </button>
+                        </div>
                     </div>
                     <div class="card"><div class="card-header"><h3>EPG 统计</h3></div>
                         <div class="status-list" style="margin-top:15px;">
@@ -853,14 +863,14 @@
                     </div>
                     <div class="modal-body" style="padding-top: 10px; display: flex; flex-direction: column; gap: 15px;">
                         <!-- 日期导航翻页条 -->
-                        <div class="epg-date-nav" style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px;">
+                        <div class="epg-date-nav">
                             <button class="btn btn-secondary btn-sm" :disabled="epgPreviewDateIndex === 0" @click="prevEpgDay" style="padding: 4px 10px !important;">◀</button>
                             <span style="font-size: 14px; font-weight: 600; color: var(--text-main);">{{ epgFormattedDate }}</span>
                             <button class="btn btn-secondary btn-sm" :disabled="epgPreviewDateIndex === epgPreviewDates.length - 1" @click="nextEpgDay" style="padding: 4px 10px !important;">▶</button>
                         </div>
 
                         <!-- 节目单列表容器 -->
-                        <div class="epg-program-list" ref="epgProgramList" style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(0,0,0,0.2); padding: 8px;">
+                        <div class="epg-program-list" ref="epgProgramList">
                             <div v-if="epgLoading" style="text-align: center; padding: 40px; color: var(--text-muted);">
                                 <span class="spinner" style="margin-right: 8px; vertical-align: middle;"></span>
                                 正在加载节目单数据...
