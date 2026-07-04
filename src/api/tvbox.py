@@ -70,23 +70,25 @@ _YEAR_FILTER = {
     ]
 }
 
-_IS_FINISHED_FILTER = {
-    "key": "isfinished",
-    "name": "状态",
+# 画质过滤器（基于标题中 HD/4K 前缀识别）
+_QUALITY_FILTER = {
+    "key": "quality",
+    "name": "画质",
     "value": [
         {"n": "全部", "v": ""},
-        {"n": "更新中", "v": "0"},
-        {"n": "已完结", "v": "1"},
+        {"n": "4K", "v": "4K"},
+        {"n": "HD", "v": "HD"},
+        {"n": "SD", "v": "SD"},
     ]
 }
 
 FILTER_CONFIG = {
-    "movies":      [_COUNTRY_FILTER, _YEAR_FILTER],
-    "series":      [_COUNTRY_FILTER, _YEAR_FILTER, _IS_FINISHED_FILTER],
-    "variety":     [_COUNTRY_FILTER, _YEAR_FILTER, _IS_FINISHED_FILTER],
-    "anime":       [_COUNTRY_FILTER, _YEAR_FILTER, _IS_FINISHED_FILTER],
+    "movies":      [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
+    "series":      [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
+    "variety":     [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
+    "anime":       [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
     "kids":        [_COUNTRY_FILTER, _YEAR_FILTER],
-    "documentary": [_COUNTRY_FILTER, _YEAR_FILTER],
+    "documentary": [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
 }
 
 
