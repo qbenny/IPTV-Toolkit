@@ -2473,5 +2473,42 @@ body {
     }
 }
 
+/* EPG Preview Modal Styles */
+.epg-prog-row {
+    border-left: 3px solid transparent;
+    background: transparent;
+    transition: background-color 0.2s, border-left-color 0.2s;
+}
+
+.epg-prog-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="light"] .epg-prog-row:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.epg-prog-row.is-playing {
+    background: rgba(16, 185, 129, 0.08) !important;
+    border-left-color: #10b981 !important;
+}
+
+[data-theme="light"] .epg-prog-row.is-playing {
+    background: rgba(16, 185, 129, 0.08) !important;
+    border-left-color: #10b981 !important;
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
 
 

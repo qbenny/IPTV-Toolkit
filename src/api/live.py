@@ -378,7 +378,8 @@ async def get_channels(
     total = c.fetchone()["total"]
     
     query = f"""
-        SELECT c.*, cat.name as category_name, cat.color as category_color 
+        SELECT c.*, cat.name as category_name, cat.color as category_color,
+               (SELECT COUNT(DISTINCT program_date) FROM epg_programs WHERE channel_id = c.channel_id OR (c.tvg_id != '' AND epg_channel_id = c.tvg_id)) as epg_days
         FROM live_channels c
         LEFT JOIN live_categories cat ON c.category_id = cat.id
         {where_str}

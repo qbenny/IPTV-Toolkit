@@ -171,8 +171,8 @@ async def query_programs(
     params = []
 
     if channel_id:
-        where_clauses.append("channel_id = ?")
-        params.append(channel_id)
+        where_clauses.append("(channel_id = ? OR epg_channel_id = ?)")
+        params.extend([channel_id, channel_id])
     if date:
         where_clauses.append("program_date = ?")
         params.append(date)
@@ -182,15 +182,16 @@ async def query_programs(
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
-    # 计数
-    c.execute(f"SELECT COUNT(*) FROM epg_programs WHERE {where_sql}", params)
+    # 计数（按 epg_channel_id 和 start_time 去重）
+    c.execute(f"SELECT COUNT(DISTINCT epg_channel_id || '_' || start_time) FROM epg_programs WHERE {where_sql}", params)
     total = c.fetchone()[0]
 
-    # 分页查询
+    # 分页查询（按 epg_channel_id 和 start_time 去重，避免多画质版本重复显示数据）
     offset = (page - 1) * limit
     c.execute(f"""
         SELECT id, channel_id, channel_name, title, start_time, end_time, program_date
         FROM epg_programs WHERE {where_sql}
+        GROUP BY epg_channel_id, start_time
         ORDER BY start_time
         LIMIT ? OFFSET ?
     """, params + [limit, offset])

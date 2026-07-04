@@ -431,7 +431,9 @@
                                         <td style="white-space: nowrap;">
                                             <span class="channel-name-cell">{{ ch.display_name || ch.name }}</span>
                                             <span v-if="ch.source === 'external'" class="channel-tag" style="background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); border-color: rgba(var(--color-primary-rgb), 0.2);">外部</span>
-                                            <span v-if="ch.timeshift_enabled === 1" class="channel-tag" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.2);" title="支持时移回看">时移</span>
+                                            <span v-if="ch.timeshift_enabled === 1" class="channel-tag" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.2);" :title="'支持时移回看，回看时长共 ' + (ch.back_time || 0) + ' 天'">回看: {{ ch.back_time || 0 }}天</span>
+                                            <span v-if="ch.epg_days && ch.epg_days > 0" class="channel-tag" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2); font-weight: 600; cursor: pointer;" :title="'点击预览 EPG 节目单 (当前共 ' + ch.epg_days + ' 天)'" @click="openEpgPreview(ch)">EPG: {{ ch.epg_days }}天</span>
+                                            <span v-else class="channel-tag" style="background: rgba(100, 116, 139, 0.1); color: #64748b; border-color: rgba(100, 116, 139, 0.2); opacity: 0.7;" title="暂无可用 EPG 数据">无EPG</span>
                                         </td>
                                         <td>
                                             <select class="cat-select" v-model="ch.category_id" @change="changeChannelCategory(ch)"
@@ -833,6 +835,60 @@
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-primary" @click="showAliasModal = false">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- EPG 节目单预览弹窗 -->
+        <transition name="fade">
+            <div class="modal-overlay" v-if="showEpgPreviewModal" @click.self="showEpgPreviewModal = false">
+                <div class="modal-card epg-preview-card" style="max-width: 580px; width: 90%;">
+                    <div class="modal-header">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3>📺 {{ epgPreviewChannel ? (epgPreviewChannel.display_name || epgPreviewChannel.name) : 'EPG 节目单预览' }}</h3>
+                            <span class="badge" v-if="epgPreviewChannel && epgPreviewChannel.tvg_id" style="font-size: 11px;">EPG ID: {{ epgPreviewChannel.tvg_id }}</span>
+                        </div>
+                        <button class="modal-close" @click="showEpgPreviewModal = false">×</button>
+                    </div>
+                    <div class="modal-body" style="padding-top: 10px; display: flex; flex-direction: column; gap: 15px;">
+                        <!-- 日期导航翻页条 -->
+                        <div class="epg-date-nav" style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px;">
+                            <button class="btn btn-secondary btn-sm" :disabled="epgPreviewDateIndex === 0" @click="prevEpgDay" style="padding: 4px 10px !important;">◀</button>
+                            <span style="font-size: 14px; font-weight: 600; color: var(--text-main);">{{ epgFormattedDate }}</span>
+                            <button class="btn btn-secondary btn-sm" :disabled="epgPreviewDateIndex === epgPreviewDates.length - 1" @click="nextEpgDay" style="padding: 4px 10px !important;">▶</button>
+                        </div>
+
+                        <!-- 节目单列表容器 -->
+                        <div class="epg-program-list" ref="epgProgramList" style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(0,0,0,0.2); padding: 8px;">
+                            <div v-if="epgLoading" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                <span class="spinner" style="margin-right: 8px; vertical-align: middle;"></span>
+                                正在加载节目单数据...
+                            </div>
+                            <div v-else-if="epgPrograms.length === 0" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                暂无该日期的节目单数据 📺
+                            </div>
+                            <div v-else>
+                                <div v-for="prog in epgPrograms" :key="prog.id" 
+                                     :class="['epg-prog-row', { 'is-playing': isProgramPlaying(prog) }]"
+                                     ref="epgRows"
+                                     style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; transition: background-color 0.2s;">
+                                    <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
+                                        <!-- 左侧时间与状态 -->
+                                        <div style="display: flex; align-items: center; gap: 8px; min-width: 165px; flex-shrink: 0;">
+                                            <span class="epg-time" style="font-family: monospace; font-size: 13px; font-weight: 600; color: var(--color-secondary);">
+                                                {{ formatProgTimeRange(prog) }}
+                                            </span>
+                                            <span v-if="isProgramPlaying(prog)" class="channel-tag" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3); font-weight: 600; font-size: 10px; padding: 1px 6px; animation: pulse-green 2s infinite; white-space: nowrap;" title="当前正在直播的节目">🟢 正在播放</span>
+                                        </div>
+                                        <!-- 右侧节目名称 -->
+                                        <span class="epg-title" style="font-size: 13px; color: var(--text-main); font-weight: 500; text-align: left; flex-grow: 1; word-break: break-all;">
+                                            {{ prog.title }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
