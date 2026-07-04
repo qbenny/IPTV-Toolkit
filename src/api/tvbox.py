@@ -13,12 +13,19 @@ from src.utils.logger import logger
 
 # 模拟器实例（在 main.py 启动时注入）
 _simulator = None
+_login_func = lambda: None
 
 
 def set_simulator(sim):
     """设置全局模拟器实例（在 main.py 启动时调用）。"""
     global _simulator
     _simulator = sim
+
+
+def set_login_func(login_fn):
+    """设置全局登录回调函数。"""
+    global _login_func
+    _login_func = login_fn
 
 
 def get_simulator():
@@ -182,6 +189,9 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
     logger.info("[TVBox] ac=%s, t=%s, pg=%s, sort=%s, wd=%s, ids=%s, f=%s", ac, t, pg, sort, wd, ids, f_param[:100] if f_param else "")
 
     sim = get_simulator()
+    if sim:
+        from src.auth.heartbeat import ensure_authenticated
+        ensure_authenticated(sim, _login_func)
 
     # ---------- 场景 1: 获取视频详情 ----------
     if ac == "detail" and ids:
@@ -233,7 +243,7 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
         item_type, item_code = parts
 
         try:
-            ensure_authenticated(sim, lambda: None)  # 登录由外层保证
+            ensure_authenticated(sim, _login_func)
             if not sim.state.is_authenticated:
                 continue
 
