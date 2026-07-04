@@ -259,6 +259,18 @@ def full_sync(sim) -> dict:
         _set_epg_status(running=False, last_error="获取频道编码映射失败")
         return {"channel_count": 0, "program_count": 0}
 
+    # 一次性更新所有频道在数据库中的 back_time
+    conn_bt = get_db_connection()
+    c_bt = conn_bt.cursor()
+    for cid, info in code_mapping.items():
+        back_time = info.get("backTime", 0)
+        try:
+            c_bt.execute("UPDATE live_channels SET back_time = ? WHERE channel_id = ?", (back_time, cid))
+        except Exception as e:
+            logger.warning("[EPG Sync] 更新 channel_id=%s 的 back_time 失败: %s", cid, e)
+    conn_bt.commit()
+    conn_bt.close()
+
     # Step 2: 去重
     dedup = _dedup_channels(code_mapping)
     total_channels = len(dedup)
@@ -299,13 +311,8 @@ def full_sync(sim) -> dict:
             logger.debug("[EPG Sync] %s: 跳过(EPG '%s' 已由其他画质版本同步)", channel_name, epg_chid)
             continue
 
-        # 计算日期范围
-        if back_time >= 7:
-            begin = (today - timedelta(days=7)).strftime("%Y%m%d")
-        elif back_time >= 3:
-            begin = (today - timedelta(days=3)).strftime("%Y%m%d")
-        else:
-            begin = today_str
+        # 计算日期范围：所有频道一律同步过去7天至明天的节目单
+        begin = (today - timedelta(days=7)).strftime("%Y%m%d")
 
         _set_epg_status(
             progress=f"[{i+1}/{total_channels}] {channel_name}",

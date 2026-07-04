@@ -106,6 +106,7 @@ def init_db():
             fcc_port          TEXT DEFAULT '',
             fec_port          TEXT DEFAULT '',
             raw_fields_json   TEXT DEFAULT '',
+            back_time         INTEGER DEFAULT 0,
             synced_at         INTEGER DEFAULT 0,
             created_at        INTEGER DEFAULT 0
         )
@@ -135,6 +136,13 @@ def init_db():
     except sqlite3.OperationalError:
         c.execute("ALTER TABLE live_channels ADD COLUMN display_name TEXT DEFAULT ''")
         logger.info("[DB] 迁移：已添加 live_channels.display_name 列")
+
+    # 数据库迁移：为旧库添加 back_time 列
+    try:
+        c.execute("SELECT back_time FROM live_channels LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE live_channels ADD COLUMN back_time INTEGER DEFAULT 0")
+        logger.info("[DB] 迁移：已添加 live_channels.back_time 列")
 
     # 直播索引
     c.execute("CREATE INDEX IF NOT EXISTS idx_live_source ON live_channels(source)")
