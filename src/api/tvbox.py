@@ -333,10 +333,32 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     "vod_remarks": "高清"
                 })
 
-            # C. 电视剧资源
+            # C. 电视剧/多集资源
             elif item_type == "series":
                 series_info = sim.get_series_info(vod_id)
+                # 若 EPG 返回 0 集，则该内容实际是单视频(VOD)，回退到 vod 模式
+                if series_info and not series_info.get("episodes"):
+                    logger.info("[TVBox] series 无剧集，回退 vod 模式: %s", item_code)
+                    series_info = None
+
                 if not series_info:
+                    # 回退为 VOD：直接用 vod_id 请求播放地址
+                    db_item = get_item_by_code(item_code)
+                    pic_url = (db_item.get("icon") or db_item.get("poster") or "") if db_item else ""
+                    name = db_item.get("title") or item_code
+                    display_name = name
+                    if db_item and db_item.get("year") and has_title_duplicate(name):
+                        display_name = f"{name} ({db_item['year']})"
+                    detail_list.append({
+                        "vod_id": current_id,
+                        "vod_name": display_name,
+                        "vod_pic": pic_url,
+                        "type_name": "内容",
+                        "vod_content": "热播专区",
+                        "vod_play_from": "电信专线",
+                        "vod_play_url": f"播放${vod_id}",
+                        "vod_remarks": "高清"
+                    })
                     continue
 
                 name = series_info.get("name") or f"{item_code} (电视剧)"
