@@ -317,7 +317,7 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                 content = result_vod.get("introduce") or "热播大片专区"
 
                 db_item = get_item_by_code(item_code)
-                pic_url = (db_item.get("icon") or db_item.get("poster") or "") if db_item else ""
+                pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
                 # 仅当数据库中存在重名内容时，才拼接年份以区分
                 display_name = name
                 if db_item and db_item.get("year") and has_title_duplicate(name):
@@ -372,7 +372,7 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     ep_play_urls.append(f"第{num_str}集${play_url}")
 
                 db_item = get_item_by_code(item_code)
-                pic_url = (db_item.get("icon") or db_item.get("poster") or "") if db_item else ""
+                pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
                 # 仅当数据库中存在重名内容时，才拼接年份以区分
                 display_name = name
                 if db_item and db_item.get("year") and has_title_duplicate(name):
