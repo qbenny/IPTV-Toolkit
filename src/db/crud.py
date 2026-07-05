@@ -301,23 +301,6 @@ def get_item_by_code(content_code: str) -> Optional[dict]:
     return None
 
 
-def has_title_duplicate(title: str) -> bool:
-    """检查数据库中是否存在与给定标题重名的其他记录。
-
-    Args:
-        title: 要检查的标题
-
-    Returns:
-        True if count > 1 (存在重名)
-    """
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM vod_items WHERE title = ?", (title,))
-    count = c.fetchone()[0]
-    conn.close()
-    return count > 1
-
-
 def get_stats() -> dict:
     """获取数据库统计信息。
 
