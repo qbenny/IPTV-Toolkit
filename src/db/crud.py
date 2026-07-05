@@ -107,7 +107,7 @@ def _get_order_by(sort: str) -> str:
         "score": "score DESC, contentCode ASC",
         "time": "year DESC, score DESC, contentCode ASC",
         "hits": "score DESC, contentCode ASC",
-        "new":  "first_seen_at DESC, score DESC, contentCode ASC",
+        "new":  "first_seen_at DESC, year DESC, score DESC, contentCode ASC",
     }
     return sort_map.get(sort, "year DESC, score DESC, contentCode ASC")
 
