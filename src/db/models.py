@@ -180,7 +180,9 @@ def init_db():
         "timeshift_enabled": "1",
         "epg_url": "",
         "logo_base_url": "/static/logo/",
-        "m3u_dual_line": "0"
+        "m3u_dual_line": "0",
+        "low_quality_filter": "1",  # 低质量视频过滤开关（长标题+无评分=垃圾）
+        "m3u8_filter": "1",         # m3u8 内容池过滤开关（JHT/YANHUA/YANKUM）
     }
     for k, v in default_configs.items():
         c.execute("""
