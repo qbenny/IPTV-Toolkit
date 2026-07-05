@@ -121,6 +121,7 @@ _SORT_FILTER = {
     "key": "sort",
     "name": "排序",
     "value": [
+        {"n": "按最新", "v": "new"},
         {"n": "按评分", "v": "score"},
         {"n": "按年份", "v": "time"},
     ]
