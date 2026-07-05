@@ -144,6 +144,13 @@ def init_db():
         c.execute("ALTER TABLE live_channels ADD COLUMN back_time INTEGER DEFAULT 0")
         logger.info("[DB] 迁移：已添加 live_channels.back_time 列")
 
+    # 数据库迁移：为旧库添加 first_seen_at 列（记录内容首次出现时间）
+    try:
+        c.execute("SELECT first_seen_at FROM vod_items LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE vod_items ADD COLUMN first_seen_at INTEGER DEFAULT 0")
+        logger.info("[DB] 迁移：已添加 vod_items.first_seen_at 列")
+
     # 直播索引
     c.execute("CREATE INDEX IF NOT EXISTS idx_live_source ON live_channels(source)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_live_category ON live_channels(category_id)")

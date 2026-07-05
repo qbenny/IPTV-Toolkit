@@ -8,7 +8,7 @@ import time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from src.db.crud import filter_items, search_items, get_stats, get_item_by_code, has_title_duplicate
+from src.db.crud import filter_items, search_items, get_stats, get_item_by_code
 from src.utils.logger import logger
 
 # 模拟器实例（在 main.py 启动时注入）
@@ -226,7 +226,7 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
     ac = request.query_params.get("ac", "")
     t = request.query_params.get("t", "")
     pg = request.query_params.get("pg", "1")
-    sort = request.query_params.get("sort", "score")
+    sort = request.query_params.get("sort", "time")
     wd = request.query_params.get("wd", "")
     ids = request.query_params.get("ids", "")
     f_param = request.query_params.get("f", "")
@@ -318,13 +318,9 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
 
                 db_item = get_item_by_code(item_code)
                 pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
-                # 仅当数据库中存在重名内容时，才拼接年份以区分
-                display_name = name
-                if db_item and db_item.get("year") and has_title_duplicate(name):
-                    display_name = f"{name} ({db_item['year']})"
                 detail_list.append({
                     "vod_id": current_id,
-                    "vod_name": display_name,
+                    "vod_name": name,
                     "vod_pic": pic_url,
                     "type_name": "电影",
                     "vod_content": content,
@@ -346,12 +342,9 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     db_item = get_item_by_code(item_code)
                     pic_url = (db_item.get("icon") or db_item.get("poster") or "") if db_item else ""
                     name = db_item.get("title") or item_code
-                    display_name = name
-                    if db_item and db_item.get("year") and has_title_duplicate(name):
-                        display_name = f"{name} ({db_item['year']})"
                     detail_list.append({
                         "vod_id": current_id,
-                        "vod_name": display_name,
+                        "vod_name": name,
                         "vod_pic": pic_url,
                         "type_name": "内容",
                         "vod_content": "热播专区",
@@ -395,13 +388,9 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
 
                 db_item = get_item_by_code(item_code)
                 pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
-                # 仅当数据库中存在重名内容时，才拼接年份以区分
-                display_name = name
-                if db_item and db_item.get("year") and has_title_duplicate(name):
-                    display_name = f"{name} ({db_item['year']})"
                 detail_list.append({
                     "vod_id": current_id,
-                    "vod_name": display_name,
+                    "vod_name": name,
                     "vod_pic": pic_url,
                     "type_name": "电视剧",
                     "vod_content": content,

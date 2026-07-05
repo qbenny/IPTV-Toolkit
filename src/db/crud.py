@@ -64,8 +64,9 @@ def bulk_upsert_items(items: list, type_name: str, sync_time: int) -> int:
                 INSERT INTO vod_items (
                     contentCode, title, type, contentType, year, country,
                     actors, director, score, icon, poster, isFinished,
-                    episodeTotal, contentBaseType, contentBaseTags, syncedAt
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    episodeTotal, contentBaseType, contentBaseTags, syncedAt,
+                    first_seen_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(contentCode) DO UPDATE SET
                     title = excluded.title,
                     type = excluded.type,
@@ -85,7 +86,8 @@ def bulk_upsert_items(items: list, type_name: str, sync_time: int) -> int:
             """, (
                 content_code, title, type_name, content_type, year, country,
                 actors, director, score, icon, poster, is_finished,
-                episode_total, content_base_type, content_base_tags, sync_time
+                episode_total, content_base_type, content_base_tags, sync_time,
+                sync_time  # first_seen_at
             ))
             count += 1
         except Exception as e:
@@ -105,8 +107,9 @@ def _get_order_by(sort: str) -> str:
         "score": "score DESC, contentCode ASC",
         "time": "year DESC, score DESC, contentCode ASC",
         "hits": "score DESC, contentCode ASC",
+        "new":  "first_seen_at DESC, score DESC, contentCode ASC",
     }
-    return sort_map.get(sort, "score DESC, contentCode ASC")
+    return sort_map.get(sort, "year DESC, score DESC, contentCode ASC")
 
 # m3u8 专用内容池前缀（TVBox 播放器不兼容，屏蔽这些池的资源）
 _M3U8_POOLS = ["JHT%", "YANHUA%", "YANKUM%"]
@@ -114,7 +117,7 @@ _M3U8_EXCLUDE_SQL = "".join(" AND contentCode NOT LIKE ?" for _ in _M3U8_POOLS)
 _M3U8_EXCLUDE_PARAMS = list(_M3U8_POOLS)
 
 
-def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "score") -> dict:
+def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "time") -> dict:
     """搜索 vod_items 数据。
 
     Args:
@@ -177,7 +180,7 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
     }
 
 
-def filter_items(content_type: str, filters: dict = None, page: int = 1, page_size: int = 20, sort: str = "score") -> dict:
+def filter_items(content_type: str, filters: dict = None, page: int = 1, page_size: int = 20, sort: str = "time") -> dict:
     """按条件和过滤参数查询 vod_items。
 
     Args:
@@ -299,23 +302,6 @@ def get_item_by_code(content_code: str) -> Optional[dict]:
     if row:
         return dict(row)
     return None
-
-
-def has_title_duplicate(title: str) -> bool:
-    """检查数据库中是否存在与给定标题重名的其他记录。
-
-    Args:
-        title: 要检查的标题
-
-    Returns:
-        True if count > 1 (存在重名)
-    """
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM vod_items WHERE title = ?", (title,))
-    count = c.fetchone()[0]
-    conn.close()
-    return count > 1
 
 
 def get_stats() -> dict:
