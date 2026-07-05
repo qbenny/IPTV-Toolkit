@@ -82,13 +82,57 @@ _QUALITY_FILTER = {
     ]
 }
 
+# 纪录片分类过滤器
+_DOC_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "自然", "v": "0604"},
+        {"n": "动物", "v": "0612"},
+        {"n": "美食", "v": "0615"},
+        {"n": "人文", "v": "0627"},
+        {"n": "历史", "v": "0603"},
+        {"n": "社会", "v": "0610"},
+        {"n": "探险", "v": "0606"},
+        {"n": "科技", "v": "0607"}
+    ]
+}
+
+# 综艺分类过滤器
+_VARIETY_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "晚会盛典", "v": "0411"},
+        {"n": "真人秀场", "v": "bastag2081"},
+        {"n": "幽默搞笑", "v": "0402"},
+        {"n": "户外竞技", "v": "0412"},
+        {"n": "文化国潮", "v": "0428"},
+        {"n": "情感观察", "v": "0401"},
+        {"n": "推理辩论", "v": "0415"},
+        {"n": "职场竞演", "v": "2547"}
+    ]
+}
+
+# 排序过滤器
+_SORT_FILTER = {
+    "key": "sort",
+    "name": "排序",
+    "value": [
+        {"n": "按评分", "v": "score"},
+        {"n": "按年份", "v": "time"},
+    ]
+}
+
 FILTER_CONFIG = {
-    "movies":      [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
-    "series":      [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
-    "variety":     [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
-    "anime":       [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
-    "kids":        [_COUNTRY_FILTER, _YEAR_FILTER],
-    "documentary": [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER],
+    "movies":      [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
+    "series":      [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
+    "variety":     [_VARIETY_SUB_TYPE_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
+    "anime":       [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
+    "kids":        [_COUNTRY_FILTER, _YEAR_FILTER, _SORT_FILTER],
+    "documentary": [_DOC_SUB_TYPE_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
 }
 
 
@@ -207,7 +251,8 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
     # ---------- 场景 3: 分类列表 ----------
     if t:
         filters = _parse_f_param(f_param)
-        result = filter_items(t, filters, page, sort=sort)
+        current_sort = filters.get("sort", sort)
+        result = filter_items(t, filters, page, sort=current_sort)
         result["filters"] = {t: FILTER_CONFIG.get(t, [])}
         return JSONResponse(content={"code": 1, **result})
 

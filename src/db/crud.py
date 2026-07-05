@@ -211,6 +211,11 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
         sql += " AND country = ?"
         params.append(filters["country"])
 
+    if filters.get("sub_type"):
+        sub_type = filters["sub_type"]
+        sql += " AND (contentBaseTags = ? OR contentBaseTags LIKE ? OR contentBaseTags LIKE ? OR contentBaseTags LIKE ?)"
+        params.extend([sub_type, f"{sub_type}|%", f"%|{sub_type}|%", f"%|{sub_type}"])
+
     if filters.get("year"):
         year_val = filters["year"]
         if "-" in year_val:
