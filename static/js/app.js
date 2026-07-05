@@ -58,7 +58,9 @@ const app = createApp({
             liveCategories: [],
             liveConfig: {
                 udpxy_address: '', epg_url: '', logo_base_url: '',
-                fcc_global_enabled_bool: false, timeshift_enabled_bool: false, m3u_dual_line_bool: false
+                fcc_global_enabled_bool: false, timeshift_enabled_bool: false,
+                m3u_dual_line_bool: false,
+                low_quality_filter_bool: true, m3u8_filter_bool: true
             },
             newCategory: { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 },
             editingCh: null,
@@ -611,7 +613,9 @@ const app = createApp({
                     udpxy_enabled_bool: config.udpxy_enabled === '1',
                     fcc_global_enabled_bool: config.fcc_global_enabled === '1',
                     timeshift_enabled_bool: config.timeshift_enabled === '1',
-                    m3u_dual_line_bool: config.m3u_dual_line === '1'
+                    m3u_dual_line_bool: config.m3u_dual_line === '1',
+                    low_quality_filter_bool: config.low_quality_filter !== '0',  // 默认开启
+                    m3u8_filter_bool: config.m3u8_filter !== '0'  // 默认开启
                 };
             } catch (e) { /* silent */ }
             this.$nextTick(() => {
@@ -767,12 +771,16 @@ const app = createApp({
                 udpxy_enabled: this.liveConfig.udpxy_enabled_bool ? '1' : '0',
                 fcc_global_enabled: this.liveConfig.fcc_global_enabled_bool ? '1' : '0',
                 timeshift_enabled: this.liveConfig.timeshift_enabled_bool ? '1' : '0',
-                m3u_dual_line: this.liveConfig.m3u_dual_line_bool ? '1' : '0'
+                m3u_dual_line: this.liveConfig.m3u_dual_line_bool ? '1' : '0',
+                low_quality_filter: this.liveConfig.low_quality_filter_bool ? '1' : '0',
+                m3u8_filter: this.liveConfig.m3u8_filter_bool ? '1' : '0'
             };
             delete payload.udpxy_enabled_bool;
             delete payload.fcc_global_enabled_bool;
             delete payload.timeshift_enabled_bool;
             delete payload.m3u_dual_line_bool;
+            delete payload.low_quality_filter_bool;
+            delete payload.m3u8_filter_bool;
 
             try {
                 const r = await fetch('/api/live/config', {

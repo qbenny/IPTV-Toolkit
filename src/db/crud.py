@@ -116,7 +116,64 @@ _M3U8_POOLS = ["JHT%", "YANHUA%", "YANKUM%"]
 _M3U8_EXCLUDE_SQL = "".join(" AND contentCode NOT LIKE ?" for _ in _M3U8_POOLS)
 _M3U8_EXCLUDE_PARAMS = list(_M3U8_POOLS)
 
+_M3U8_FILTER_CONFIG_KEY = "m3u8_filter"
 
+def _m3u8_filter_enabled() -> bool:
+    """检查 m3u8 池过滤是否启用（默认开启）。"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT value FROM live_config WHERE key=?", (_M3U8_FILTER_CONFIG_KEY,))
+        row = c.fetchone()
+        conn.close()
+        return row is None or row[0] == "1"
+    except Exception:
+        return True
+
+
+def _m3u8_exclude_sql() -> tuple:
+    """返回 m3u8 池过滤 SQL 和参数。关掉时返回空。"""
+    if not _m3u8_filter_enabled():
+        return "", []
+    return _M3U8_EXCLUDE_SQL, _M3U8_EXCLUDE_PARAMS.copy()
+
+# 低质量视频过滤（长标题 + 无评分 + 无集数 = 短视频垃圾）
+_LQ_FILTER_CONFIG_KEY = "low_quality_filter"
+
+
+def _low_quality_enabled() -> bool:
+    """检查低质量过滤是否启用（默认开启）。"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT value FROM live_config WHERE key=?", (_LQ_FILTER_CONFIG_KEY,))
+        row = c.fetchone()
+        conn.close()
+        return row is None or row[0] == "1"  # 不存在或值为"1"都算开启
+    except Exception:
+        return True  # 容错
+
+
+def _low_quality_sql(db_type: str = None) -> tuple:
+    """返回低质量过滤 SQL 和参数。关掉时返回空。
+    
+    只对电视剧、综艺、纪录生效；电影/少儿/动漫不加过滤。
+    """
+    if not _low_quality_enabled():
+        return "", []
+
+    sql = ""
+    params = []
+
+    if db_type in ("电视剧", "综艺"):
+        # 无评分 + 无集数 = 短视频/切片垃圾
+        sql = " AND NOT (episodeTotal = 0 AND score = 0)"
+    elif db_type == "纪录":
+        # 无评分 + 无集数 + 无海报（不限标题长度，纪录垃圾标题也短）
+        sql = " AND NOT (episodeTotal = 0 AND score = 0 AND poster = '')"
+    # 电影、少儿、动漫不加过滤
+
+    return sql, params
 def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "time") -> dict:
     """搜索 vod_items 数据。
 
@@ -134,11 +191,14 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
 
     like_kw = f"%{keyword}%"
 
+    m3u8_sql, m3u8_params = _m3u8_exclude_sql()
+    lq_sql, lq_params = _low_quality_sql()  # 搜索不限类型，用通用规则
     # 总数
     c.execute("""
         SELECT COUNT(*) FROM vod_items
         WHERE (title LIKE ? OR actors LIKE ? OR director LIKE ?)
-    """ + _M3U8_EXCLUDE_SQL, (like_kw, like_kw, like_kw, *_M3U8_EXCLUDE_PARAMS))
+    """ + m3u8_sql + lq_sql,
+        (like_kw, like_kw, like_kw, *m3u8_params, *lq_params))
     total = c.fetchone()[0]
 
     # 分页查询
@@ -149,8 +209,8 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
                actors, director, score, icon, poster, isFinished, episodeTotal
         FROM vod_items
         WHERE (title LIKE ? OR actors LIKE ? OR director LIKE ?)
-    """ + _M3U8_EXCLUDE_SQL + f" ORDER BY {order_clause} LIMIT ? OFFSET ?",
-        (like_kw, like_kw, like_kw, *_M3U8_EXCLUDE_PARAMS, page_size, offset))
+    """ + m3u8_sql + lq_sql + f" ORDER BY {order_clause} LIMIT ? OFFSET ?",
+        (like_kw, like_kw, like_kw, *m3u8_params, *lq_params, page_size, offset))
     rows = c.fetchall()
     conn.close()
 
@@ -206,8 +266,10 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
     conn = get_db_connection()
     c = conn.cursor()
 
-    sql = "SELECT COUNT(*) FROM vod_items WHERE type = ?" + _M3U8_EXCLUDE_SQL
-    params = [db_type, *_M3U8_EXCLUDE_PARAMS]
+    m3u8_sql, m3u8_params = _m3u8_exclude_sql()
+    lq_sql, lq_params = _low_quality_sql(db_type)
+    sql = "SELECT COUNT(*) FROM vod_items WHERE type = ?" + m3u8_sql + lq_sql
+    params = [db_type, *m3u8_params, *lq_params]
 
     filters = filters or {}
     if filters.get("country"):
