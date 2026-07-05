@@ -227,7 +227,7 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
     ac = request.query_params.get("ac", "")
     t = request.query_params.get("t", "")
     pg = request.query_params.get("pg", "1")
-    sort = request.query_params.get("sort", "time")
+    sort = request.query_params.get("sort", "new")
     wd = request.query_params.get("wd", "")
     ids = request.query_params.get("ids", "")
     f_param = request.query_params.get("f", "")
