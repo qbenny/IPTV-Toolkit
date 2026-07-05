@@ -118,7 +118,6 @@ _M3U8_EXCLUDE_PARAMS = list(_M3U8_POOLS)
 
 _M3U8_FILTER_CONFIG_KEY = "m3u8_filter"
 
-
 def _m3u8_filter_enabled() -> bool:
     """检查 m3u8 池过滤是否启用（默认开启）。"""
     try:
@@ -175,8 +174,6 @@ def _low_quality_sql(db_type: str = None) -> tuple:
     # 电影、少儿、动漫不加过滤
 
     return sql, params
-
-
 def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "time") -> dict:
     """搜索 vod_items 数据。
 
