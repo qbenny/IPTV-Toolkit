@@ -163,7 +163,7 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
         result_list.append({
             "vod_id": f"{item_type}_{row['contentCode']}",
             "vod_name": row["title"],
-            "vod_pic": row["icon"] or row["poster"] or "",
+            "vod_pic": row["poster"] or row["icon"] or "",
             "vod_remarks": " | ".join(remarks_parts),
         })
 
@@ -268,7 +268,7 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
         result_list.append({
             "vod_id": f"{item_type}_{row['contentCode']}",
             "vod_name": row["title"],
-            "vod_pic": row["icon"] or row["poster"] or "",
+            "vod_pic": row["poster"] or row["icon"] or "",
             "vod_remarks": " | ".join(remarks_parts),
         })
 
