@@ -108,6 +108,11 @@ def _get_order_by(sort: str) -> str:
     }
     return sort_map.get(sort, "score DESC, contentCode ASC")
 
+# m3u8 专用内容池前缀（TVBox 播放器不兼容，屏蔽这些池的资源）
+_M3U8_POOLS = ["JHT%", "YANHUA%", "YANKUM%"]
+_M3U8_EXCLUDE_SQL = "".join(" AND contentCode NOT LIKE ?" for _ in _M3U8_POOLS)
+_M3U8_EXCLUDE_PARAMS = list(_M3U8_POOLS)
+
 
 def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "score") -> dict:
     """搜索 vod_items 数据。
@@ -129,8 +134,8 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
     # 总数
     c.execute("""
         SELECT COUNT(*) FROM vod_items
-        WHERE title LIKE ? OR actors LIKE ? OR director LIKE ?
-    """, (like_kw, like_kw, like_kw))
+        WHERE (title LIKE ? OR actors LIKE ? OR director LIKE ?)
+    """ + _M3U8_EXCLUDE_SQL, (like_kw, like_kw, like_kw, *_M3U8_EXCLUDE_PARAMS))
     total = c.fetchone()[0]
 
     # 分页查询
@@ -140,10 +145,9 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
         SELECT contentCode, title, type, contentBaseType, year, country,
                actors, director, score, icon, poster, isFinished, episodeTotal
         FROM vod_items
-        WHERE title LIKE ? OR actors LIKE ? OR director LIKE ?
-        ORDER BY {order_clause}
-        LIMIT ? OFFSET ?
-    """, (like_kw, like_kw, like_kw, page_size, offset))
+        WHERE (title LIKE ? OR actors LIKE ? OR director LIKE ?)
+    """ + _M3U8_EXCLUDE_SQL + f" ORDER BY {order_clause} LIMIT ? OFFSET ?",
+        (like_kw, like_kw, like_kw, *_M3U8_EXCLUDE_PARAMS, page_size, offset))
     rows = c.fetchall()
     conn.close()
 
@@ -199,8 +203,8 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
     conn = get_db_connection()
     c = conn.cursor()
 
-    sql = "SELECT COUNT(*) FROM vod_items WHERE type = ?"
-    params = [db_type]
+    sql = "SELECT COUNT(*) FROM vod_items WHERE type = ?" + _M3U8_EXCLUDE_SQL
+    params = [db_type, *_M3U8_EXCLUDE_PARAMS]
 
     filters = filters or {}
     if filters.get("country"):
