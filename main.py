@@ -76,6 +76,7 @@ def login_sim() -> bool:
         success = sim.login()
         if success:
             logger.info(">>> [STB] 登录成功，EPG 网关: %s", sim.state.epg_base_url)
+            sim.state.update_activity()   # 刷新活跃时间戳，防止心跳线程误清认证
             _start_heartbeat()
             return True
         else:

@@ -62,6 +62,11 @@ const app = createApp({
                 m3u_dual_line_bool: false,
                 low_quality_filter_bool: true, m3u8_filter_bool: true
             },
+            // VOD 过滤设置（独立于 liveConfig，避免保存时覆盖直播配置）
+            vodConfig: {
+                low_quality_filter_bool: true,
+                m3u8_filter_bool: true
+            },
             newCategory: { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 },
             editingCh: null,
             showAliasModal: false,
@@ -185,6 +190,7 @@ const app = createApp({
         this.fetchStbConfig();
         this.fetchDbStats();
         this.fetchSimStatus(); // Initial fetch of auth status globally
+        this.fetchVodConfig();  // 加载 VOD 过滤设置（独立于 liveConfig）
         if (this.activeTab === 'stb') {
             this.startSimStatusPolling();
         } else if (this.activeTab === 'live') {
@@ -794,6 +800,39 @@ const app = createApp({
                     this.fetchLiveChannels(this.liveFilter.page);
                 } else {
                     this.showToast('配置保存失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        // VOD 过滤设置（独立于 liveConfig，仅发送过滤字段，不影响直播配置）
+        async fetchVodConfig() {
+            try {
+                const r = await fetch('/api/live/config');
+                const config = await r.json();
+                this.vodConfig.low_quality_filter_bool = config.low_quality_filter !== '0';
+                this.vodConfig.m3u8_filter_bool = config.m3u8_filter !== '0';
+            } catch (e) {
+                console.warn('获取 VOD 过滤设置失败，使用默认值', e);
+            }
+        },
+
+        async saveVodConfig() {
+            const payload = {
+                low_quality_filter: this.vodConfig.low_quality_filter_bool ? '1' : '0',
+                m3u8_filter: this.vodConfig.m3u8_filter_bool ? '1' : '0'
+            };
+            try {
+                const r = await fetch('/api/live/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (r.ok) {
+                    this.showToast('过滤设置已保存');
+                } else {
+                    this.showToast('保存失败', 'error');
                 }
             } catch (e) {
                 this.showToast('网络错误', 'error');
