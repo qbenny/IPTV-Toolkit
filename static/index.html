@@ -249,7 +249,7 @@
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 15px;">
                             <label class="switch-item">
                                 <label class="switch-toggle">
-                                    <input type="checkbox" v-model="liveConfig.low_quality_filter_bool">
+                                    <input type="checkbox" v-model="vodConfig.low_quality_filter_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">🗑️ 过滤低质量内容</span>
@@ -260,7 +260,7 @@
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 10px;">
                             <label class="switch-item">
                                 <label class="switch-toggle">
-                                    <input type="checkbox" v-model="liveConfig.m3u8_filter_bool">
+                                    <input type="checkbox" v-model="vodConfig.m3u8_filter_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">📦 屏蔽 m3u8 内容池</span>
@@ -269,7 +269,7 @@
                         </div>
 
                         <div class="form-actions" style="margin-top: 15px;">
-                            <button class="btn btn-primary" @click="saveLiveConfig" style="width: 100%;">💾 保存过滤设置</button>
+                            <button class="btn btn-primary" @click="saveVodConfig" style="width: 100%;">💾 保存过滤设置</button>
                         </div>
 
                     </div>
