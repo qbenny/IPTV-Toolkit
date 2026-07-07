@@ -378,7 +378,7 @@ def full_sync(sim) -> dict:
     _set_epg_status(
         running=False,
         progress="同步完成",
-        last_sync_time=datetime.now().isoformat(),
+        last_sync_time=int(time.time()),
         done=0, total=0,
         channel_count=ok_channels,
         program_count=total_programs,

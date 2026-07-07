@@ -194,12 +194,11 @@ def _parse_f_param(f_param: str) -> dict:
 async def get_tvbox_config(request: Request) -> JSONResponse:
     """返回 TVBox 配置（/zjvod 接口）。"""
     api_url = str(request.base_url) + "api/vod"
-    cfg_ver = str(int(time.time()))
 
     config_data = {
         "sites": [
             {
-                "key": f"Telecom_VOD_{cfg_ver}",
+                "key": "Telecom_VOD",
                 "name": "浙江电信点播",
                 "type": 1,
                 "api": api_url,
