@@ -822,15 +822,11 @@ def refresh_source_tree_bg():
 @app.get("/zjvod") #待修改
 async def get_tvbox_config(request: Request):
     api_url = str(request.base_url) + "api/vod"
-    
-    cfg_ver = "1"
-    if os.path.exists(VOD_CATEGORIES_FILE):
-        cfg_ver = str(int(os.path.getmtime(VOD_CATEGORIES_FILE)))
         
     config_data = {
         "sites": [
             {
-                "key": f"Telecom_VOD_{cfg_ver}",
+                "key": "Telecom_VOD",
                 "name": "浙江电信点播",
                 "type": 1,
                 "api": api_url,
