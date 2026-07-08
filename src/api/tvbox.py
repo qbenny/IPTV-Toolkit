@@ -352,9 +352,10 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
         result["filters"] = {t: FILTER_CONFIG.get(t, [])}
         return JSONResponse(content={"code": 1, **result})
 
-    # ---------- 场景 4: 初始化 - 返回顶级分类和过滤器 ----------
+    # ---------- 场景 4: 初始化 - 返回顶级分类、过滤器与推荐列表 ----------
     vis_categories = []
     vis_filters = {}
+    rec_list = []
 
     for cat_id, cat_filters in FILTER_CONFIG.items():
         name_map = {
@@ -366,7 +367,15 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
         vis_categories.append({"type_id": cat_id, "type_name": name_map.get(cat_id, cat_id)})
         vis_filters[cat_id] = cat_filters
 
-    return JSONResponse(content={"code": 1, "class": vis_categories, "filters": vis_filters})
+    # 首页推荐列表：按评分降序取高分内容，优先电影/电视剧/综艺/动漫
+    rec_list = _build_recommend_list()
+
+    return JSONResponse(content={
+        "code": 1,
+        "class": vis_categories,
+        "filters": vis_filters,
+        "list": rec_list
+    })
 
 
 def _quality_remark(name: str) -> str:
@@ -379,6 +388,77 @@ def _quality_remark(name: str) -> str:
     if "HD" in upper:
         return "高清"
     return "标清"
+
+
+def _build_recommend_list() -> list:
+    """构建首页推荐列表。
+
+    仅取电影/电视剧/综艺/纪录 4 个主分类，每类按首次入库时间（first_seen_at）降序
+    取最新内容（与各大分类默认 new 排序一致），同名去重保留最高画质（4K > HD > 标清），
+    返回 TVBox 初始化接口所需的 list 格式。
+    """
+    import re
+    import sqlite3
+    from src.db.models import DB_PATH
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # 仅取首页主推的 4 个大类及每类数量
+    priority = [("电视剧", 7), ("电影", 7), ("综艺", 7), ("纪录", 7)]
+
+    # 画质优先级：值越小优先级越高
+    _QUALITY_ORDER = {"4K": 0, "高清": 1, "标清": 2}
+
+    def _dedup(items):
+        """同名去重，保留最高画质（4K>高清>标清），保持原出现顺序。"""
+        seen = {}
+        out = []
+        for it in items:
+            k = it["_clean"]
+            if k not in seen or it["_q_order"] < seen[k]["_q_order"]:
+                if k in seen:
+                    out.remove(seen[k])
+                seen[k] = it
+                out.append(it)
+        return out
+
+    rec = []
+    for cat_type, limit in priority:
+        rows = c.execute("""
+            SELECT contentCode, title, poster, icon, score
+            FROM vod_items
+            WHERE type=?
+            ORDER BY first_seen_at DESC, year DESC, score DESC, contentCode ASC
+            LIMIT ?
+        """, (cat_type, limit * 4))  # 多取候选，去重后仍能凑满该分类配额
+
+        cat_items = []
+        for r in rows:
+            code, title, poster, icon, score = r
+            pic = poster or icon or ""
+            quality = _quality_remark(title)
+            # 去除标题中的 4K/HD/SD- 等画质标识（前缀或后缀），作为去重键
+            clean = re.sub(r'^(4K|HD|SD)[-–—]?\s*|\s*[-–—]?(4K|HD|SD)$', '', title)
+            cat_items.append({
+                "vod_id": f"vod_{code}",
+                "vod_name": title,
+                "vod_pic": pic,
+                "vod_remarks": quality,
+                "_clean": clean,
+                "_q_order": _QUALITY_ORDER.get(quality, 99),
+            })
+
+        # 分类内去重后取配额，保证各分类均衡且总数维持 26
+        rec.extend(_dedup(cat_items)[:limit])
+
+    conn.close()
+
+    for item in rec:
+        del item["_clean"]
+        del item["_q_order"]
+
+    return rec
 
 
 async def _handle_detail(ids: str, sim) -> JSONResponse:
