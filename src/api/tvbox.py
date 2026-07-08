@@ -82,12 +82,13 @@ _QUALITY_FILTER = {
     ]
 }
 
-# 纪录片分类过滤器
+# 纪录片分类过滤器（2548/0602/bastag11577/bastag12849 已核实命名）
 _DOC_SUB_TYPE_FILTER = {
     "key": "sub_type",
     "name": "分类",
     "value": [
         {"n": "全部", "v": ""},
+        {"n": "军事", "v": "0602"},
         {"n": "自然", "v": "0604"},
         {"n": "动物", "v": "0612"},
         {"n": "美食", "v": "0615"},
@@ -95,7 +96,10 @@ _DOC_SUB_TYPE_FILTER = {
         {"n": "历史", "v": "0603"},
         {"n": "社会", "v": "0610"},
         {"n": "探险", "v": "0606"},
-        {"n": "科技", "v": "0607"}
+        {"n": "科技", "v": "0607"},
+        {"n": "灾难", "v": "2548"},
+        {"n": "时政", "v": "bastag11577"},
+        {"n": "央视", "v": "bastag12849"},
     ]
 }
 
@@ -113,6 +117,87 @@ _VARIETY_SUB_TYPE_FILTER = {
         {"n": "情感观察", "v": "0401"},
         {"n": "推理辩论", "v": "0415"},
         {"n": "职场竞演", "v": "2547"}
+    ]
+}
+
+# 新闻栏目过滤器（contentType='series' 的连续播出节目，共 19 条，最有浏览价值）
+_NEWS_COLUMN_FILTER = {
+    "key": "col_type",
+    "name": "新闻栏目",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "新闻栏目", "v": "series"},
+    ]
+}
+
+# 新闻分类过滤器（子标签 ID 来自 VIS contentBaseTags，已用真实库验证）
+#   0203 时政(2778) / 0212 社会(570) 为文档 §五 已确认中文名的主要分类
+_NEWS_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "军事", "v": "0203"},
+        {"n": "社会", "v": "0204"},
+        {"n": "科技", "v": "0205"},
+        {"n": "财经", "v": "0206"},
+        {"n": "法治", "v": "0207"},
+        {"n": "资讯", "v": "0212"},
+    ]
+}
+
+# 体育分类过滤器（0512 游戏(569) / 0513 赛事(17)，真实库验证）
+_SPORTS_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "足球", "v": "0501"},
+        {"n": "篮球", "v": "0502"},
+        {"n": "网球", "v": "0503"},
+        {"n": "游戏", "v": "0512"},
+        {"n": "棋牌", "v": "0513"},
+        {"n": "健康", "v": "bastag12413"},
+        {"n": "钓鱼", "v": "bastag_18495"},
+        {"n": "滑雪", "v": "bastag_18883"},
+    ]
+}
+
+# 体育内容形式过滤器（contentType 精确 50/50：series 栏目 / vod 单集，真实库验证各 732 条）
+_SPORTS_FORM_FILTER = {
+    "key": "col_type",
+    "name": "内容形式",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "栏目", "v": "series"},
+        {"n": "单集", "v": "vod"},
+    ]
+}
+
+# 戏曲分类过滤器（真实库验证）
+_OPERA_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "京剧", "v": "1501"},
+        {"n": "豫剧", "v": "1507"},
+        {"n": "越剧", "v": "1508"},
+        {"n": "黄梅戏", "v": "1509"},
+        {"n": "昆曲", "v": "bastag7295"},
+        {"n": "婺剧", "v": "bastag12453"},
+        {"n": "绍剧", "v": "bastag9553"},
+    ]
+}
+
+# 戏曲内容形式过滤器（contentType：series 栏目(24) / vod 单集(1558)，真实库验证）
+_OPERA_FORM_FILTER = {
+    "key": "col_type",
+    "name": "内容形式",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "栏目", "v": "series"},
+        {"n": "单集", "v": "vod"},
     ]
 }
 
@@ -134,6 +219,11 @@ FILTER_CONFIG = {
     "anime":       [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
     "kids":        [_COUNTRY_FILTER, _YEAR_FILTER, _SORT_FILTER],
     "documentary": [_DOC_SUB_TYPE_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
+    # 新增大类：子标签过滤器待全量同步后实测 contentBaseTags 再补
+    "opera":       [_OPERA_SUB_TYPE_FILTER, _OPERA_FORM_FILTER, _YEAR_FILTER],
+    "sports":      [_SPORTS_SUB_TYPE_FILTER, _SPORTS_FORM_FILTER, _YEAR_FILTER, _SORT_FILTER],
+    "news":        [_NEWS_SUB_TYPE_FILTER, _NEWS_COLUMN_FILTER, _YEAR_FILTER, _SORT_FILTER],
+    "other":       [_COUNTRY_FILTER, _YEAR_FILTER, _SORT_FILTER],
 }
 
 
@@ -264,7 +354,8 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
         name_map = {
             "movies": "电影专区", "series": "电视剧场",
             "variety": "综艺荟萃", "anime": "动漫世界", "kids": "少儿天地",
-            "documentary": "纪录大观"
+            "documentary": "纪录大观",
+            "opera": "戏曲天地", "sports": "体育竞技", "news": "新闻速递", "other": "其他"
         }
         vis_categories.append({"type_id": cat_id, "type_name": name_map.get(cat_id, cat_id)})
         vis_filters[cat_id] = cat_filters

@@ -270,6 +270,10 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
         "anime": "动漫",
         "kids": "少儿",
         "documentary": "纪录",
+        "news": "新闻",
+        "sports": "体育",
+        "opera": "戏曲",
+        "other": "其他",
     }
     db_type = type_map.get(content_type, content_type)
 
@@ -313,6 +317,11 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
             # HD 或 4K
             sql += " AND title LIKE ?"
             params.append(f"%{q}%")
+
+    if filters.get("col_type"):
+        # 新闻栏目：按 contentType 区分（series=连续播出栏目，vod=单条新闻）
+        sql += " AND contentType = ?"
+        params.append(filters["col_type"])
 
     # Count
     c.execute(sql, params)
