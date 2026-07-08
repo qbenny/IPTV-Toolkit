@@ -8,7 +8,7 @@ import time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from src.db.crud import filter_items, search_items, get_stats, get_item_by_code
+from src.db.crud import filter_items, search_items, get_stats, get_item_by_code, _low_quality_sql
 from src.utils.logger import logger
 
 # 模拟器实例（在 main.py 启动时注入）
@@ -425,13 +425,16 @@ def _build_recommend_list() -> list:
 
     rec = []
     for cat_type, limit in priority:
+        # 复用与分类列表一致的「低质量过滤」规则（切片短视频），按各分类分别套用
+        lq_sql, lq_params = _low_quality_sql(cat_type)
         rows = c.execute("""
             SELECT contentCode, title, poster, icon, score
             FROM vod_items
             WHERE type=?
+        """ + lq_sql + """
             ORDER BY first_seen_at DESC, year DESC, score DESC, contentCode ASC
             LIMIT ?
-        """, (cat_type, limit * 4))  # 多取候选，去重后仍能凑满该分类配额
+        """, (cat_type, *lq_params, limit * 4))  # 多取候选，去重后仍能凑满该分类配额
 
         cat_items = []
         for r in rows:
