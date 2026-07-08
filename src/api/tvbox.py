@@ -295,7 +295,13 @@ async def get_tvbox_config(request: Request) -> JSONResponse:
                 "playUrl": "json:" + str(request.base_url) + "api/play?vod_id=",
                 "searchable": 1,
                 "quickSearch": 1,
-                "filterable": 1
+                "filterable": 1,
+                # categories：客户端本地过滤显示的分类（按显示名匹配 type_name）。
+                # 不包含「其他」，TVBox 将自动隐藏该分类。
+                "categories": [
+                    "电影专区", "电视剧场", "综艺荟萃", "动漫世界",
+                    "少儿天地", "纪录大观", "戏曲天地", "体育竞技", "新闻速递"
+                ]
             }
         ]
     }
@@ -363,6 +369,18 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
     return JSONResponse(content={"code": 1, "class": vis_categories, "filters": vis_filters})
 
 
+def _quality_remark(name: str) -> str:
+    """根据标题判断画质备注：含 4K→4K，含 HD→高清，否则→标清。"""
+    if not name:
+        return "标清"
+    upper = name.upper()
+    if "4K" in upper:
+        return "4K"
+    if "HD" in upper:
+        return "高清"
+    return "标清"
+
+
 async def _handle_detail(ids: str, sim) -> JSONResponse:
     """处理视频详情请求（实时从 EPG 解析播放地址）。"""
     from src.utils.helpers import parse_epg_json
@@ -413,11 +431,15 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     "vod_id": current_id,
                     "vod_name": name,
                     "vod_pic": pic_url,
-                    "type_name": "电影",
+                    "type_name": db_item.get("type", "") if db_item else "",
                     "vod_content": content,
+                    "vod_year": db_item.get("year", "") if db_item else "",
+                    "vod_area": db_item.get("country", "") if db_item else "",
+                    "vod_actor": db_item.get("actors", "") if db_item else "",
+                    "vod_director": db_item.get("director", "") if db_item else "",
                     "vod_play_from": "电信专线",
                     "vod_play_url": f"播放${play_url}",
-                    "vod_remarks": "高清"
+                    "vod_remarks": _quality_remark(name)
                 })
 
             # C. 电视剧/多集资源
@@ -431,17 +453,21 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                 if not series_info:
                     # 回退为 VOD：直接用 vod_id 请求播放地址
                     db_item = get_item_by_code(item_code)
-                    pic_url = (db_item.get("icon") or db_item.get("poster") or "") if db_item else ""
+                    pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
                     name = db_item.get("title") or item_code
                     detail_list.append({
                         "vod_id": current_id,
                         "vod_name": name,
                         "vod_pic": pic_url,
-                        "type_name": "内容",
+                        "type_name": db_item.get("type", "") if db_item else "",
                         "vod_content": "热播专区",
+                        "vod_year": db_item.get("year", "") if db_item else "",
+                        "vod_area": db_item.get("country", "") if db_item else "",
+                        "vod_actor": db_item.get("actors", "") if db_item else "",
+                        "vod_director": db_item.get("director", "") if db_item else "",
                         "vod_play_from": "电信专线",
                         "vod_play_url": f"播放${vod_id}",
-                        "vod_remarks": "高清"
+                        "vod_remarks": _quality_remark(name)
                     })
                     continue
 
@@ -483,11 +509,16 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     "vod_id": current_id,
                     "vod_name": name,
                     "vod_pic": pic_url,
-                    "type_name": "电视剧",
+                    "type_name": db_item.get("type", "") if db_item else "",
                     "vod_content": content,
+                    "vod_year": db_item.get("year", "") if db_item else "",
+                    "vod_area": db_item.get("country", "") if db_item else "",
+                    "vod_actor": db_item.get("actors", "") if db_item else "",
+                    "vod_director": db_item.get("director", "") if db_item else "",
                     "vod_play_from": "电信专线",
                     "vod_play_url": "#".join(ep_play_urls),
-                    "vod_remarks": f"更新至{len(ep_play_urls)}集" if ep_play_urls else "暂无内容"
+                    "vod_remarks": (f"{_quality_remark(name)} | 更新至{len(ep_play_urls)}集"
+                                    if ep_play_urls else _quality_remark(name))
                 })
 
         except Exception as e:
