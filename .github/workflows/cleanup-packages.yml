@@ -1,0 +1,34 @@
+name: Cleanup Old Docker Images
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # 每周日凌晨 2 点自动运行 (UTC 时间)
+  workflow_dispatch:      # 允许在 Actions 页面手动点击运行
+
+jobs:
+  clean-ghcr:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write     # 必须的权限：允许删除包
+      contents: read
+    
+    steps:
+      # 第一步：清剿所有彻底无标签的“幽灵/垃圾”镜像
+      - name: Delete untagged images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'iptv-toolkit'            # 这里根据你之前的截图填入了包名，如有不同请修改
+          package-type: 'container'
+          delete-only-untagged-versions: 'true'   # 只删除无标签镜像
+          min-versions-to-keep: 0                 # 无标签的一个都不留
+
+      # 第二步：清理带标签的旧历史镜像（控制总数）
+      - name: Delete old historical images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'iptv-toolkit'
+          package-type: 'container'
+          # 保留最近的 10 个版本（相当于 latest 历史和 test 历史各留存约 5 个）
+          min-versions-to-keep: 10
+          # 核心保护名单：绝对不要删除当前被打上 latest、test 或者是 v1.x 正式版本号的镜像
+          ignore-versions: '^(latest|test|v.*)$'

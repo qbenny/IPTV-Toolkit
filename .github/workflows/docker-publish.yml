@@ -2,7 +2,8 @@ name: Build and Publish Docker Image
 
 on:
   push:
-    branches: [ "main", "master" ]
+    # 只允许 main, master 和以 dev 开头的分支触发构建（**代表匹配包含斜杠在内的任何字符，例如 dev-test, dev/feature1）
+    branches: [ "main", "master", "dev**" ]
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "main", "master" ]
@@ -43,11 +44,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # 只有以 dev 开头的分支 push 时，才会自动打上 test 标签
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
+            type=raw,value=test,enable=${{ startsWith(github.ref_name, 'dev') && github.event_name == 'push' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -57,5 +60,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          # 关闭默认生成的 SLSA Provenance 构建证明，消除 unknown/unknown
+          provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
