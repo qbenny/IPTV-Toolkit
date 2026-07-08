@@ -51,7 +51,11 @@ def init_db():
             episodeTotal    INTEGER DEFAULT 0,
             contentBaseType TEXT DEFAULT '',
             contentBaseTags TEXT DEFAULT '',
-            syncedAt        INTEGER DEFAULT 0
+            subTitle       TEXT DEFAULT '',
+            searchName     TEXT DEFAULT '',
+            still          TEXT DEFAULT '',
+            syncedAt        INTEGER DEFAULT 0,
+            first_seen_at   INTEGER DEFAULT 0
         )
     """)
 
@@ -150,6 +154,14 @@ def init_db():
     except sqlite3.OperationalError:
         c.execute("ALTER TABLE vod_items ADD COLUMN first_seen_at INTEGER DEFAULT 0")
         logger.info("[DB] 迁移：已添加 vod_items.first_seen_at 列")
+
+    # 数据库迁移：为旧库添加 subTitle / searchName / still 列（filter.json 未用字段）
+    for col in ("subTitle", "searchName", "still"):
+        try:
+            c.execute(f"SELECT {col} FROM vod_items LIMIT 1")
+        except sqlite3.OperationalError:
+            c.execute(f"ALTER TABLE vod_items ADD COLUMN {col} TEXT DEFAULT ''")
+            logger.info(f"[DB] 迁移：已添加 vod_items.{col} 列")
 
     # 直播索引
     c.execute("CREATE INDEX IF NOT EXISTS idx_live_source ON live_channels(source)")

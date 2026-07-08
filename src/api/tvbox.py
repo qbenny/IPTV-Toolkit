@@ -334,7 +334,7 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                 series_info = sim.get_series_info(vod_id)
                 # 若 EPG 返回 0 集，则该内容实际是单视频(VOD)，回退到 vod 模式
                 if series_info and not series_info.get("episodes"):
-                    logger.info("[TVBox] series 无剧集，回退 vod 模式: %s", item_code)
+                    logger.debug("[TVBox] series 无剧集，回退 vod 模式: %s", item_code)
                     series_info = None
 
                 if not series_info:

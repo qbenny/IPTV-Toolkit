@@ -47,7 +47,7 @@ def bulk_upsert_items(items: list, type_name: str, sync_time: int) -> int:
                 continue
 
             title = item.get("title", "")
-            content_type = item.get("contentType", "vod")
+            content_type = item.get("type", "vod")
             year = item.get("year", "") or ""
             country = _normalize_country(item.get("country", "") or "")
             actors = item.get("actors", "") or ""
@@ -59,14 +59,17 @@ def bulk_upsert_items(items: list, type_name: str, sync_time: int) -> int:
             episode_total = item.get("updateNum", 0) or 0
             content_base_type = item.get("contentBaseType", "") or ""
             content_base_tags = item.get("contentBaseTags", "") or ""
+            sub_title = item.get("subTitle", "") or ""
+            search_name = item.get("searchName", "") or ""
+            still = item.get("still", "") or ""
 
             c.execute("""
                 INSERT INTO vod_items (
                     contentCode, title, type, contentType, year, country,
                     actors, director, score, icon, poster, isFinished,
                     episodeTotal, contentBaseType, contentBaseTags, syncedAt,
-                    first_seen_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    first_seen_at, subTitle, searchName, still
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(contentCode) DO UPDATE SET
                     title = excluded.title,
                     type = excluded.type,
@@ -82,12 +85,16 @@ def bulk_upsert_items(items: list, type_name: str, sync_time: int) -> int:
                     episodeTotal = excluded.episodeTotal,
                     contentBaseType = excluded.contentBaseType,
                     contentBaseTags = excluded.contentBaseTags,
-                    syncedAt = excluded.syncedAt
+                    syncedAt = excluded.syncedAt,
+                    subTitle = excluded.subTitle,
+                    searchName = excluded.searchName,
+                    still = excluded.still
             """, (
                 content_code, title, type_name, content_type, year, country,
                 actors, director, score, icon, poster, is_finished,
                 episode_total, content_base_type, content_base_tags, sync_time,
-                sync_time  # first_seen_at
+                sync_time,  # first_seen_at
+                sub_title, search_name, still
             ))
             count += 1
         except Exception as e:
@@ -166,11 +173,12 @@ def _low_quality_sql(db_type: str = None) -> tuple:
     params = []
 
     if db_type in ("电视剧", "综艺"):
-        # 无评分 + 无集数 = 短视频/切片垃圾
-        sql = " AND NOT (episodeTotal = 0 AND score = 0)"
+        # 垃圾 = contentType=vod 的单集切片/B站短视频（天然无集数 + 无评分）；
+        # 真正的 series 即便 episodeTotal=0/score=0 也只是数据缺失，不应误杀
+        sql = " AND NOT (contentType = 'vod' AND episodeTotal = 0 AND score = 0)"
     elif db_type == "纪录":
-        # 无评分 + 无集数 + 无海报（不限标题长度，纪录垃圾标题也短）
-        sql = " AND NOT (episodeTotal = 0 AND score = 0 AND poster = '')"
+        # 同上，纪录垃圾还需无海报（不限标题长度，纪录垃圾标题也短）
+        sql = " AND NOT (contentType = 'vod' AND episodeTotal = 0 AND score = 0 AND poster = '')"
     # 电影、少儿、动漫不加过滤
 
     return sql, params
@@ -205,7 +213,7 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
     offset = (page - 1) * page_size
     order_clause = _get_order_by(sort)
     c.execute(f"""
-        SELECT contentCode, title, type, contentBaseType, year, country,
+        SELECT contentCode, title, type, contentBaseType, contentType, year, country,
                actors, director, score, icon, poster, isFinished, episodeTotal
         FROM vod_items
         WHERE (title LIKE ? OR actors LIKE ? OR director LIKE ?)
@@ -216,7 +224,9 @@ def search_items(keyword: str, page: int = 1, page_size: int = 20, sort: str = "
 
     result_list = []
     for row in rows:
-        item_type = "vod" if row["contentBaseType"] == "001" else "series"
+        # 用 filter.json 权威标记 contentType（vod/series）判断单集/分集，
+        # 替代粗略代理 contentBaseType=="001"（会把真实单集误判为 series）
+        item_type = "vod" if row["contentType"] == "vod" else "series"
         # 组合 remarks：类型 + 年份 + 评分，便于区分同名内容
         remarks_parts = [row["type"] or ""]
         if row["year"]:
@@ -310,7 +320,7 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
 
     # Query with sorting
     data_sql = sql.replace("SELECT COUNT(*)", """
-        SELECT contentCode, title, type, contentBaseType, year, country,
+        SELECT contentCode, title, type, contentBaseType, contentType, year, country,
                actors, director, score, icon, poster, isFinished, episodeTotal
     """)
     order_clause = _get_order_by(sort)
@@ -323,7 +333,9 @@ def filter_items(content_type: str, filters: dict = None, page: int = 1, page_si
 
     result_list = []
     for row in rows:
-        item_type = "vod" if row["contentBaseType"] == "001" else "series"
+        # 用 filter.json 权威标记 contentType（vod/series）判断单集/分集，
+        # 替代粗略代理 contentBaseType=="001"（会把真实单集误判为 series）
+        item_type = "vod" if row["contentType"] == "vod" else "series"
         # 组合 remarks：类型 + 年份 + 评分，便于区分同名内容
         remarks_parts = [row["type"] or ""]
         if row["year"]:
@@ -449,7 +461,7 @@ if __name__ == "__main__":
         {
             "contentCode": "TEST001",
             "title": "测试电影1",
-            "contentType": "vod",
+            "type": "vod",
             "year": "2024",
             "country": "美国",
             "actors": "测试演员A",
@@ -458,7 +470,7 @@ if __name__ == "__main__":
         {
             "contentCode": "TEST002",
             "title": "测试电视剧1",
-            "contentType": "series",
+            "type": "series",
             "year": "2023",
             "country": "内地",
             "actors": "测试演员B",
