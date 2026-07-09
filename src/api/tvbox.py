@@ -544,12 +544,7 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     if not num_str or not num_str.isdigit():
                         num_str = str(display_num)
 
-                    telecom_code = ep.get("telecom_code", "")
-                    if telecom_code:
-                        play_url = f"{ep_id}${telecom_code}"
-                    else:
-                        play_url = ep_id
-                    ep_play_urls.append(f"第{num_str}集${play_url}")
+                    ep_play_urls.append(f"第{num_str}集${ep_id}")
 
                 db_item = get_item_by_code(item_code)
                 pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""

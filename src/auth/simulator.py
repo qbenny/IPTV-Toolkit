@@ -289,64 +289,21 @@ class STBSimulator:
             self.logger.error("拉取 VOD 详细信息时发生异常: %s", e)
             return None
 
-    def get_vod_play_url(self, telecom_code_or_id: str) -> Optional[str]:
-        """获取点播节目的单播 RTSP 播放地址。
-
-        支持 "ep_id$telecom_code" 双fallback格式：先用ep_id直连，失败再用telecom_code走vodIdByCode转换。
-        """
+    def get_vod_play_url(self, vod_id: str) -> Optional[str]:
+        """获取点播节目的单播 RTSP 播放地址。"""
         if not self.state.is_authenticated:
             self.logger.error("未认证，无法获取点播播放地址。")
             return None
 
-        # 解析双fallback格式
-        primary_id = telecom_code_or_id
-        fallback_code = None
-        if "$" in telecom_code_or_id:
-            parts = telecom_code_or_id.split("$", 1)
-            primary_id = parts[0]
-            fallback_code = parts[1] if len(parts) > 1 and parts[1] else None
-
-        data_url = f"{self.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
-
-        def _resolve_one(target_id: str) -> Optional[str]:
-            vod_id = target_id
-            if not target_id.isdigit():
-                self.logger.info("检测到 telecomCode 格式，正在转换内部 vodId...")
-                params_code = {"Action": "vodIdByCode", "foreignSN": target_id, "contentType": "0"}
-                try:
-                    res = self.state.session.get(data_url, params=params_code, headers=self.config.headers, timeout=10)
-                    res_data = parse_epg_json(res.text)
-                    ret_id = res_data.get("result", {}).get("id")
-                    if ret_id:
-                        vod_id = str(ret_id)
-                        self.logger.info("电信编码转换内部 ID 成功: %s -> %s", target_id, vod_id)
-                    else:
-                        self.logger.warning("转换内部 ID 失败，尝试直接使用原 ID 访问。")
-                except Exception as e:
-                    self.logger.error("调用 vodIdByCode 发生异常: %s", e)
-
-            # 2. 模拟拉取节目详细信息与 RTSP 播放地址
-            self.logger.info("正在获取 VOD 媒体播放地址 (Action=vodInfoById)...")
-            result = self.get_vod_info(vod_id)
-            if result and "mediaUrl" in result:
-                return result["mediaUrl"]
-            return None
-
-        # 主ID解析
-        self.logger.info("========== 开始获取 VOD 播放地址: %s ==========", primary_id)
-        media_url = _resolve_one(primary_id)
-
-        # 回退
-        if not media_url and fallback_code:
-            self.logger.info("========== 主ID解析失败，尝试用 telecomCode 回退: %s ==========", fallback_code)
-            media_url = _resolve_one(fallback_code)
-
-        if media_url:
+        self.logger.info("========== 开始获取 VOD 播放地址: %s ==========", vod_id)
+        self.logger.info("正在获取 VOD 媒体播放地址 (Action=vodInfoById)...")
+        result = self.get_vod_info(vod_id)
+        if result and "mediaUrl" in result:
             self.logger.info("成功解析出点播 RTSP 播放地址!")
-            return media_url
-        else:
-            self.logger.error("所有解析路径均失败，未获取到有效的 mediaUrl。")
-            return None
+            return result["mediaUrl"]
+
+        self.logger.error("解析失败，未获取到有效的 mediaUrl。")
+        return None
 
     def get_series_info(self, series_id: str) -> Optional[dict]:
         """拉取电视剧的集数及剧集列表信息。"""
@@ -377,7 +334,6 @@ class STBSimulator:
                 episodes.append({
                     "id": str(ep.get("id", "")),
                     "num": str(ep.get("num", "")),
-                    "telecom_code": ep.get("telecomCode", ""),
                 })
 
             series_info = {
