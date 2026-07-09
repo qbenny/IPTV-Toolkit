@@ -325,17 +325,6 @@ class STBSimulator:
                 except Exception as e:
                     self.logger.error("调用 vodIdByCode 发生异常: %s", e)
 
-            # 1. 模拟业务鉴权流程
-            self.logger.info("正在发送点播鉴权请求 (Action=serviceAuth)...")
-            params_auth = {"Action": "serviceAuth", "progId": vod_id, "contentType": "1"}
-            try:
-                res = self.state.session.get(data_url, params=params_auth, headers=self.config.headers, timeout=10)
-                res_data = parse_epg_json(res.text)
-                retcode = res_data.get("result", {}).get("retcode")
-                self.logger.info("点播服务鉴权返回状态码: %s", retcode)
-            except Exception as e:
-                self.logger.error("点播服务鉴权时发生异常: %s", e)
-
             # 2. 模拟拉取节目详细信息与 RTSP 播放地址
             self.logger.info("正在获取 VOD 媒体播放地址 (Action=vodInfoById)...")
             result = self.get_vod_info(vod_id)
