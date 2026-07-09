@@ -8,7 +8,7 @@ import time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from src.db.crud import filter_items, search_items, get_stats, get_item_by_code, _low_quality_sql
+from src.db.crud import filter_items, search_items, get_stats, get_item_by_code
 from src.utils.logger import logger
 
 # 模拟器实例（在 main.py 启动时注入）
@@ -393,19 +393,14 @@ def _quality_remark(name: str) -> str:
 def _build_recommend_list() -> list:
     """构建首页推荐列表。
 
-    仅取电影/电视剧/综艺/纪录 4 个主分类，每类按首次入库时间（first_seen_at）降序
-    取最新内容（与各大分类默认 new 排序一致），同名去重保留最高画质（4K > HD > 标清），
-    返回 TVBox 初始化接口所需的 list 格式。
+    直接复用分类列表 filter_items（含 m3u8 池屏蔽 + 低质量过滤、new 排序、
+    vod_id/remarks 拼装），仅在此基础上按分类各取候选后做同名去重
+    （保留最高画质 4K>高清>标清）并按配额截取，返回 TVBox 初始化接口所需的 list 格式。
     """
     import re
-    import sqlite3
-    from src.db.models import DB_PATH
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # 仅取首页主推的 4 个大类及每类数量
-    priority = [("电视剧", 7), ("电影", 7), ("综艺", 7), ("纪录", 7)]
+    # 首页主推 4 大类（TVBox 分类 id → 每类数量），顺序：电视剧/电影/综艺/纪录
+    priority = [("series", 7), ("movies", 7), ("variety", 7), ("documentary", 7)]
 
     # 画质优先级：值越小优先级越高
     _QUALITY_ORDER = {"4K": 0, "高清": 1, "标清": 2}
@@ -415,54 +410,21 @@ def _build_recommend_list() -> list:
         seen = {}
         out = []
         for it in items:
-            k = it["_clean"]
-            if k not in seen or it["_q_order"] < seen[k]["_q_order"]:
-                if k in seen:
-                    out.remove(seen[k])
-                seen[k] = it
+            clean = re.sub(r'^(4K|HD|SD)[-–—]?\s*|\s*[-–—]?(4K|HD|SD)$', '', it["vod_name"])
+            q = _QUALITY_ORDER.get(_quality_remark(it["vod_name"]), 99)
+            if clean not in seen or q < seen[clean][1]:
+                if clean in seen:
+                    out.remove(seen[clean][0])
+                seen[clean] = (it, q)
                 out.append(it)
         return out
 
     rec = []
-    for cat_type, limit in priority:
-        # 复用与分类列表一致的「低质量过滤」规则（切片短视频），按各分类分别套用
-        lq_sql, lq_params = _low_quality_sql(cat_type)
-        rows = c.execute("""
-            SELECT contentCode, title, poster, icon, score, contentType
-            FROM vod_items
-            WHERE type=?
-        """ + lq_sql + """
-            ORDER BY first_seen_at DESC, year DESC, score DESC, contentCode ASC
-            LIMIT ?
-        """, (cat_type, *lq_params, limit * 4))  # 多取候选，去重后仍能凑满该分类配额
-
-        cat_items = []
-        for r in rows:
-            code, title, poster, icon, score, content_type = r
-            # 按权威标记 contentType 生成前缀：单集=vod_，分集=series_，
-            # 与分类列表/搜索一致，避免 series 内容被错当单集而首次解析失败
-            item_type = "vod" if content_type == "vod" else "series"
-            pic = poster or icon or ""
-            quality = _quality_remark(title)
-            # 去除标题中的 4K/HD/SD- 等画质标识（前缀或后缀），作为去重键
-            clean = re.sub(r'^(4K|HD|SD)[-–—]?\s*|\s*[-–—]?(4K|HD|SD)$', '', title)
-            cat_items.append({
-                "vod_id": f"{item_type}_{code}",
-                "vod_name": title,
-                "vod_pic": pic,
-                "vod_remarks": quality,
-                "_clean": clean,
-                "_q_order": _QUALITY_ORDER.get(quality, 99),
-            })
-
-        # 分类内去重后取配额，保证各分类均衡且总数维持 26
-        rec.extend(_dedup(cat_items)[:limit])
-
-    conn.close()
-
-    for item in rec:
-        del item["_clean"]
-        del item["_q_order"]
+    for cat_id, limit in priority:
+        # 复用分类列表逻辑取候选（多取以容纳去重后仍满足配额）
+        result = filter_items(cat_id, filters=None, page=1, page_size=limit * 4, sort="new")
+        items = result.get("list", [])
+        rec.extend(_dedup(items)[:limit])
 
     return rec
 
