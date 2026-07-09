@@ -428,7 +428,7 @@ def _build_recommend_list() -> list:
         # 复用与分类列表一致的「低质量过滤」规则（切片短视频），按各分类分别套用
         lq_sql, lq_params = _low_quality_sql(cat_type)
         rows = c.execute("""
-            SELECT contentCode, title, poster, icon, score
+            SELECT contentCode, title, poster, icon, score, contentType
             FROM vod_items
             WHERE type=?
         """ + lq_sql + """
@@ -438,13 +438,16 @@ def _build_recommend_list() -> list:
 
         cat_items = []
         for r in rows:
-            code, title, poster, icon, score = r
+            code, title, poster, icon, score, content_type = r
+            # 按权威标记 contentType 生成前缀：单集=vod_，分集=series_，
+            # 与分类列表/搜索一致，避免 series 内容被错当单集而首次解析失败
+            item_type = "vod" if content_type == "vod" else "series"
             pic = poster or icon or ""
             quality = _quality_remark(title)
             # 去除标题中的 4K/HD/SD- 等画质标识（前缀或后缀），作为去重键
             clean = re.sub(r'^(4K|HD|SD)[-–—]?\s*|\s*[-–—]?(4K|HD|SD)$', '', title)
             cat_items.append({
-                "vod_id": f"vod_{code}",
+                "vod_id": f"{item_type}_{code}",
                 "vod_name": title,
                 "vod_pic": pic,
                 "vod_remarks": quality,
