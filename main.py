@@ -116,6 +116,7 @@ set_sim_live(sim)
 set_login_live(login_sim)
 set_sim_epg(sim)
 set_login_epg(login_sim)
+sim.login_func = login_sim  # 供 simulator 层顶号自愈（_session_request）使用
 
 
 # ---- FastAPI 应用 ----

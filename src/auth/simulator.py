@@ -33,6 +33,9 @@ class STBSimulator:
         self.logger = _project_logger
         self.logger.info("机顶盒网络模拟器已就绪。设备账号: %s", self.config.user_id)
 
+        # 重登录回调（由 main.py 注入 login_sim），供 _session_request 顶号自愈使用
+        self.login_func = None
+
     def _log_request(self, method: str, url: str, response: requests.Response):
         """记录请求日志。"""
         self.logger.info(">>> 发送 %s 请求: %s", method, url)
@@ -273,6 +276,44 @@ class STBSimulator:
                 self.logger.error("心跳连续失败达 3 次！认定当前会话离线，清空动态 Token。")
                 self.state.clear_auth_state()
 
+    def _session_request(self, method: str, url: str, timeout: int = 15, **kwargs) -> "requests.Response":
+        """带登录壳页（resignon）自愈的底层请求方法。
+
+        若响应是门户登录壳页（被顶号/会话失效），清认证状态 + 重登录，重试一次。
+        返回 requests.Response。并发安全（ensure_authenticated 内置锁）。
+        """
+        from src.auth.heartbeat import ensure_authenticated
+
+        res = self.state.session.request(method, url, timeout=timeout, **kwargs)
+        if "resignon" in res.text and self.login_func:
+            self.logger.warning("[STB] 会话失效(收到登录壳页)，清状态重登录重试: %s", url)
+            self.state.clear_auth_state()
+            ensure_authenticated(self, self.login_func)
+            if self.state.is_authenticated:
+                res = self.state.session.request(method, url, timeout=timeout, **kwargs)
+                if "resignon" in res.text:
+                    self.logger.error("[STB] 重登录后仍为登录壳页，放弃: %s", url)
+            else:
+                self.logger.error("[STB] 检测到登录壳页但重登录失败，放弃: %s", url)
+        return res
+
+    def _session_get_json(self, url: str, params: dict, timeout: int = 15) -> dict:
+        """带登录壳页自愈的 JSON 请求；返回解析后的 dict，失败返回空 dict。"""
+        res = self._session_request("GET", url, timeout=timeout, params=params,
+                                    headers=self.config.headers)
+        return parse_epg_json(res.text)
+
+    def get_vod_id_by_code(self, item_code: str) -> Optional[str]:
+        """通过 contentCode 解析 vod_id（Action=vodIdByCode）；被顶号时自动重登录重试。"""
+        data_url = f"{self.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
+        params = {"Action": "vodIdByCode", "foreignSN": item_code, "contentType": "0"}
+        data = self._session_get_json(data_url, params, timeout=10)
+        vod_id = data.get("result", {}).get("id") if data else None
+        if not vod_id:
+            # 非壳页（壳页已在底座重试并记日志）：多为 contentCode 无效/未授权
+            self.logger.warning("[STB] vodIdByCode 未返回 vod_id（非壳页，可能 contentCode 无效）: %s", item_code)
+        return str(vod_id) if vod_id else None
+
     def get_vod_info(self, vod_id: str) -> Optional[dict]:
         """获取点播节目的详细信息（名称、介绍、播放链接等）。"""
         if not self.state.is_authenticated:
@@ -281,13 +322,8 @@ class STBSimulator:
 
         data_url = f"{self.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
         params = {"Action": "vodInfoById", "vodId": vod_id}
-        try:
-            res = self.state.session.get(data_url, params=params, headers=self.config.headers, timeout=10)
-            res_data = parse_epg_json(res.text)
-            return res_data.get("result")
-        except Exception as e:
-            self.logger.error("拉取 VOD 详细信息时发生异常: %s", e)
-            return None
+        data = self._session_get_json(data_url, params, timeout=10)
+        return data.get("result") if data else None
 
     def get_vod_play_url(self, vod_id: str) -> Optional[str]:
         """获取点播节目的单播 RTSP 播放地址。"""
@@ -321,8 +357,7 @@ class STBSimulator:
             "posteridx": "1",
         }
         try:
-            res = self.state.session.get(data_url, params=params, headers=self.config.headers, timeout=15)
-            res_data = parse_epg_json(res.text)
+            res_data = self._session_get_json(data_url, params, timeout=15)
             result = res_data.get("result", {})
             if not result:
                 self.logger.error("电视剧信息拉取失败，返回结果为空。")
@@ -374,8 +409,8 @@ class STBSimulator:
 
         url = f"{self.state.epg_base_url}/EPG/jsp/getchannellistHWCTC.jsp"
         try:
-            res = self.state.session.post(
-                url,
+            res = self._session_request(
+                "POST", url,
                 data=payload,
                 headers={
                     **self.config.headers, 

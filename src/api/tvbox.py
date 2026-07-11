@@ -429,59 +429,8 @@ def _build_recommend_list() -> list:
     return rec
 
 
-def _is_login_shell(text: str) -> bool:
-    """判断 data.jsp 返回是否为"请重新登录"的门户壳页（被顶号/会话失效时返回）。
-
-    resignon 是电信门户专属标志（Authentication.CTCSetConfig("resignon","1")），
-    正常业务 JSON 绝不含此子串，故可安全用于识别会话失效。
-    """
-    return "resignon" in text
-
-
-def _fetch_vod_id(sim, item_code: str, login_func) -> str:
-    """通过 contentCode 解析 vod_id；遇登录壳页时清状态重登录并重试一次。
-
-    返回 vod_id 字符串；若最终仍失败（含壳页）返回 None。
-    """
-    from src.utils.helpers import parse_epg_json
-    from src.auth.heartbeat import ensure_authenticated
-
-    data_url = f"{sim.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
-    params = {"Action": "vodIdByCode", "foreignSN": item_code, "contentType": "0"}
-
-    def _do():
-        return sim.state.session.get(data_url, params=params,
-                                     headers=sim.config.headers, timeout=10)
-
-    res = _do()
-    data = parse_epg_json(res.text)
-    vod_id = data.get("result", {}).get("id")
-    if vod_id:
-        return str(vod_id)
-
-    # 壳页（被顶号/会话失效）→ 清状态、重登录，重试一次
-    if _is_login_shell(res.text):
-        logger.warning("[TVBox] vodIdByCode 返回登录壳页，疑似会话被顶号，清状态重登录重试: %s", item_code)
-        sim.state.clear_auth_state()
-        ensure_authenticated(sim, login_func)
-        if sim.state.is_authenticated:
-            res = _do()
-            vod_id = parse_epg_json(res.text).get("result", {}).get("id")
-            if vod_id:
-                return str(vod_id)
-            logger.error("[TVBox] vodIdByCode 重试后仍无 vod_id（已重登录，可能仍被顶号）: %s", item_code)
-        else:
-            logger.error("[TVBox] vodIdByCode 检测到壳页但重登录失败，放弃: %s", item_code)
-        return None
-
-    # 非壳页：正常响应却无 vod_id（多为 contentCode 无效或未授权）
-    logger.warning("[TVBox] vodIdByCode 未返回 vod_id（非壳页，可能 contentCode 无效）: %s | resp=%r",
-                   item_code, res.text[:120])
-    return None
-
-
 async def _handle_detail(ids: str, sim) -> JSONResponse:
-    """处理视频详情请求（实时从 EPG 解析播放地址）。"""
+    """处理视频详情请求（实时从 EPG 解析播放地址）。被顶号自愈由 simulator 层统一处理。"""
     from src.auth.heartbeat import ensure_authenticated
 
     if sim is None:
@@ -501,8 +450,8 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
             if not sim.state.is_authenticated:
                 continue
 
-            # A. contentCode -> vod_id（遇登录壳页自动清状态重登录重试一次）
-            vod_id = _fetch_vod_id(sim, item_code, _login_func)
+            # A. contentCode -> vod_id（被顶号时由 simulator 层自动清状态重登录重试）
+            vod_id = sim.get_vod_id_by_code(item_code)
             if not vod_id:
                 continue
             vod_id = str(vod_id)
