@@ -487,3 +487,28 @@ class STBSimulator:
         except Exception as e:
             self.logger.error("获取频道列表时遭遇异常: %s", e, exc_info=True)
             return []
+
+    def get_channel_code_mapping(self) -> dict:
+        """通过 data.jsp channelListAll 获取 channelID → channelCode 映射（需登录）。
+
+        被顶号（收到 resignon 壳页）时由 _session_get_json 自动清状态重登重试一次。
+        返回 {channel_id: {"code": str, "backTime": int, "name": str}}；未认证或失败返回空 dict。
+        """
+        if not self.state.is_authenticated:
+            self.logger.error("[STB] 未认证，无法获取频道编码映射")
+            return {}
+        data_url = f"{self.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
+        params = {"Action": "channelListAll"}
+        data = self._session_get_json(data_url, params, timeout=15)
+        mapping = {}
+        for item in data.get("result", []):
+            cid = str(item.get("channelID", ""))
+            if not cid:
+                continue
+            mapping[cid] = {
+                "code": item.get("code", ""),
+                "backTime": item.get("backTime", 0),
+                "name": item.get("name", ""),
+            }
+        self.logger.info("[STB] 获取到 %d 个频道的编码映射", len(mapping))
+        return mapping

@@ -186,6 +186,13 @@ async def sync_channels():
             
         sync_time = int(time.time())
         alias_map = get_alias_map()
+
+        # 获取频道编码映射（channelListAll）：落库 channel_code 供 EPG 免登录同步 + 回看天数 back_time
+        code_map = {}
+        try:
+            code_map = _simulator.get_channel_code_mapping()
+        except Exception as e:
+            logger.warning("[Live Sync] 获取频道编码映射失败（EPG 同步将暂不可用，请检查登录态）: %s", e)
         conn = get_db_connection()
         c = conn.cursor()
         
@@ -198,6 +205,9 @@ async def sync_channels():
         
         for ch in sim_channels:
             channel_id = ch["channel_id"]
+            code_info = code_map.get(channel_id) or {}
+            ch_code = code_info.get("code", "")
+            ch_back_time = code_info.get("backTime", 0)
             
             c.execute("SELECT id, is_enabled, synced_at FROM live_channels WHERE channel_id = ? AND source = 'server'", (channel_id,))
             existing = c.fetchone()
@@ -236,6 +246,8 @@ async def sync_channels():
                         fcc_port = ?,
                         fec_port = ?,
                         raw_fields_json = ?,
+                        channel_code = ?,
+                        back_time = ?,
                         synced_at = ?,
                         is_enabled = ?
                     WHERE id = ?
@@ -263,6 +275,8 @@ async def sync_channels():
                     ch["fcc_port"],
                     ch["fec_port"],
                     ch["raw_fields_json"],
+                    ch_code,
+                    ch_back_time,
                     sync_time,
                     is_enabled,
                     existing["id"]
@@ -277,14 +291,15 @@ async def sync_channels():
                         multicast_url, unicast_url, unicast_url_full, timeshift_enabled,
                         timeshift_length, timeshift_url, is_hd, channel_type, channel_sdp,
                         channel_url_raw, channel_locked, preview_enabled, fcc_enabled,
-                        fcc_ip, fcc_port, fec_port, raw_fields_json, synced_at, created_at
+                        fcc_ip, fcc_port, fec_port, raw_fields_json, channel_code, back_time,
+                        synced_at, created_at
                     ) VALUES (
                         'server', ?, ?, ?, ?,
                         ?, ?, ?, 0, 0, 1,
                         ?, ?, ?, ?,
                         ?, ?, ?, ?, ?,
                         ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?
                     )
                 """, (
                     channel_id,
@@ -311,6 +326,8 @@ async def sync_channels():
                     ch["fcc_port"],
                     ch["fec_port"],
                     ch["raw_fields_json"],
+                    ch_code,
+                    ch_back_time,
                     sync_time,
                     sync_time
                 ))

@@ -113,6 +113,7 @@ def init_db():
             fec_port          TEXT DEFAULT '',
             raw_fields_json   TEXT DEFAULT '',
             back_time         INTEGER DEFAULT 0,
+            channel_code      TEXT DEFAULT '',
             synced_at         INTEGER DEFAULT 0,
             created_at        INTEGER DEFAULT 0
         )
@@ -149,6 +150,13 @@ def init_db():
     except sqlite3.OperationalError:
         c.execute("ALTER TABLE live_channels ADD COLUMN back_time INTEGER DEFAULT 0")
         logger.info("[DB] 迁移：已添加 live_channels.back_time 列")
+
+    # 数据库迁移：为旧库添加 channel_code 列（EPG 同步免登录：存储 VIS channelCode）
+    try:
+        c.execute("SELECT channel_code FROM live_channels LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE live_channels ADD COLUMN channel_code TEXT DEFAULT ''")
+        logger.info("[DB] 迁移：已添加 live_channels.channel_code 列")
 
     # 数据库迁移：为旧库添加 first_seen_at 列（记录内容首次出现时间）
     try:

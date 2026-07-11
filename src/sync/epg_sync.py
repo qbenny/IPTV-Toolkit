@@ -1,6 +1,7 @@
 """
 EPG 数据同步模块 — VIS schedules API → SQLite epg_programs 表。
-从 VIS 节目单服务器拉取全频道节目数据，按 backTime 分档决定同步天数。
+从 VIS 节目单服务器拉取全频道节目数据。
+频道编码 / tvg_id / 回看天数均由直播同步写入 live_channels，本模块直接读表，免登录。
 """
 import concurrent.futures
 import json
@@ -11,29 +12,34 @@ from datetime import datetime, timedelta
 import requests
 
 from src.db.models import get_db_connection
-from src.utils.helpers import parse_epg_json
 from src.utils.helpers import fetch_with_retry
 from src.utils.logger import logger
 
 
-def _build_tvg_lookup(conn) -> dict:
-    """从 live_channels 表构建 channel_id → tvg_id 映射。
+def _load_sync_channels(conn) -> dict:
+    """从 live_channels 读取待同步频道（免登录，无需 channelListAll）。
 
-    live_channels 的 tvg_id 始终存在，直接取用（与 M3U 同源，保证播放器匹配）。
-    某 channel_id 查不到 tvg_id 时，worker 会回退到服务器原始频道名。
+    直播同步已把 channel_code / tvg_id / back_time 写入 live_channels，
+    因此 EPG 同步无需任何登录或 channelListAll 调用，直接读表即可。
 
     Returns:
-        {str(channel_id): str(tvg_id)}
+        {str(channel_id): {"code": str, "name": str, "tvg_id": str}}
+        只含 channel_code 非空且 source='server' 的频道。
     """
     c = conn.cursor()
-    c.execute("SELECT channel_id, tvg_id FROM live_channels")
-    lookup = {}
+    c.execute(
+        "SELECT channel_id, channel_code, name, tvg_id FROM live_channels "
+        "WHERE source = 'server' AND channel_code != ''"
+    )
+    channels = {}
     for row in c.fetchall():
-        ch_id = str(row["channel_id"])
-        tvg = (row["tvg_id"] or "").strip()
-        if tvg:
-            lookup[ch_id] = tvg
-    return lookup
+        cid = str(row["channel_id"])
+        channels[cid] = {
+            "code": row["channel_code"],
+            "name": row["name"] or "",
+            "tvg_id": (row["tvg_id"] or "").strip(),
+        }
+    return channels
 
 # 第二轮整体并发重试次数（不再串行 sleep，间隔由线程池并发度控制）
 _MAX_BATCH_RETRIES = 2
@@ -57,43 +63,6 @@ def _set_epg_status(**kwargs):
     global epg_sync_status
     for k, v in kwargs.items():
         epg_sync_status[k] = v
-
-
-def get_channel_code_mapping(sim):
-    """通过 data.jsp channelListAll 获取 channelID → channelCode 映射。
-
-    Args:
-        sim: STBSimulator 实例（需已登录）
-
-    Returns:
-        dict: {channel_id: {"code": str, "backTime": int, "name": str}}
-    """
-    if not sim.state.is_authenticated:
-        logger.error("[EPG Sync] 未认证，无法获取频道编码映射")
-        return {}
-
-    data_url = f"{sim.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
-    try:
-        res = sim.state.session.get(
-            data_url,
-            params={"Action": "channelListAll"},
-            headers=sim.config.headers,
-            timeout=15,
-        )
-        data = parse_epg_json(res.text)
-        mapping = {}
-        for item in data.get("result", []):
-            cid = str(item["channelID"])
-            mapping[cid] = {
-                "code": item.get("code", ""),
-                "backTime": item.get("backTime", 0),
-                "name": item.get("name", ""),
-            }
-        logger.info("[EPG Sync] 获取到 %d 个频道的编码映射", len(mapping))
-        return mapping
-    except Exception as e:
-        logger.error("[EPG Sync] 获取频道编码映射失败: %s", e)
-        return {}
 
 
 def _fetch_schedule(vis_base: str, channel_code: str, begintime: str, endtime: str, headers: dict = None) -> list:
@@ -182,20 +151,19 @@ def _clean_expired(conn, keep_days: int = 9):
 
 
 def full_sync(sim) -> dict:
-    """全量同步 EPG 数据。
+    """全量同步 EPG 数据（免登录：频道编码 / tvg_id 均来自 live_channels）。
 
-    1. 登录 → channelListAll 获取 channelCode 映射
-    2. 按 backTime 决定每个频道的同步日期范围
-    3. 逐频道查询 VIS schedules API
-    4. UPSERT 写入 epg_programs
-    5. 清理过期数据
+    1. 读 live_channels（channel_code 非空）作为待同步频道
+    2. 逐频道查询 VIS schedules API（范围：过去 7 天 ~ 明天，统一窗口）
+    3. UPSERT 写入 epg_programs
+    4. 清理过期数据
 
     Returns:
         {"channel_count": int, "program_count": int}
     """
     _set_epg_status(
         running=True,
-        progress="获取频道编码映射...",
+        progress="读取待同步频道...",
         done=0, total=0,
         last_error=None,
         channel_count=0, program_count=0,
@@ -208,26 +176,16 @@ def full_sync(sim) -> dict:
         _set_epg_status(running=False, last_error="VIS 服务器地址未解析")
         return {"channel_count": 0, "program_count": 0}
 
-    # Step 1: 获取 channelCode 映射
-    code_mapping = get_channel_code_mapping(sim)
-    if not code_mapping:
-        _set_epg_status(running=False, last_error="获取频道编码映射失败")
+    # Step 1: 读 live_channels 作为待同步频道（免登录，channel_code / tvg_id 由直播同步写入）
+    conn = get_db_connection()
+    sync_channels = _load_sync_channels(conn)
+    if not sync_channels:
+        conn.close()
+        _set_epg_status(running=False, last_error="库内无含 channel_code 的频道，请先运行直播同步(live sync)以写入 channel_code")
         return {"channel_count": 0, "program_count": 0}
 
-    # 一次性更新所有频道在数据库中的 back_time
-    conn_bt = get_db_connection()
-    c_bt = conn_bt.cursor()
-    for cid, info in code_mapping.items():
-        back_time = info.get("backTime", 0)
-        try:
-            c_bt.execute("UPDATE live_channels SET back_time = ? WHERE channel_id = ?", (back_time, cid))
-        except Exception as e:
-            logger.warning("[EPG Sync] 更新 channel_id=%s 的 back_time 失败: %s", cid, e)
-    conn_bt.commit()
-    conn_bt.close()
-
-    # Step 2: 确定待同步频道总数（直接用服务器返回的频道映射，不做去重）
-    total_channels = len(code_mapping)
+    # Step 2: 确定待同步频道总数
+    total_channels = len(sync_channels)
     logger.info("[EPG Sync] %d 个频道待同步", total_channels)
 
     _set_epg_status(total=total_channels, progress="开始同步节目数据...")
@@ -240,17 +198,13 @@ def full_sync(sim) -> dict:
     # 仅当某 channel_id 在 live_channels 中查不到 tvg_id 时，才回退到服务器原始频道名。
     today = datetime.now()
     tomorrow_str = (today + timedelta(days=1)).strftime("%Y%m%d")
-    begin = (today - timedelta(days=7)).strftime("%Y%m%d")  # 所有频道统一同步范围
+    begin = (today - timedelta(days=7)).strftime("%Y%m%d")  # 所有频道统一同步范围：过去 7 天 ~ 明天
 
-    conn = get_db_connection()
     sync_time = int(time.time())
     total_programs = 0
     ok_channels = 0
     no_data_channels = 0
     failed_channels = []  # 仅记录网络请求失败的频道（(code, info)）
-
-    # 从 live_channels 获取 channel_id → tvg_id 映射（与 M3U 同一来源，确保匹配）
-    tvg_lookup = _build_tvg_lookup(conn)
 
     headers = sim.config.headers
 
@@ -260,7 +214,7 @@ def full_sync(sim) -> dict:
         # epg_channel_id 优先取 live_channels.tvg_id（与 M3U 同源，保证播放器匹配）；
         # HD/SD/4K 兄弟频道因此共享同一 epg_channel_id。仅当该 channel_id 在
         # live_channels 中查不到 tvg_id 时，才回退到服务器原始频道名（不归一化）。
-        epg_chid = tvg_lookup.get(channel_id) or channel_name
+        epg_chid = info.get("tvg_id") or channel_name
         programs, error = _fetch_schedule(vis_base, code, begin, tomorrow_str, headers=headers)
         if error:
             return ("failed", 0, channel_name)
@@ -308,7 +262,7 @@ def full_sync(sim) -> dict:
 
     # 第一轮：全量并发拉取（max_workers=5，不加额外限流）
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        failed_channels = _drain(executor, list(code_mapping.items()))
+        failed_channels = _drain(executor, list(sync_channels.items()))
 
     logger.info("[EPG Sync] 第一轮: %d 有数据, %d 无EPG, %d 请求失败",
                 ok_channels, no_data_channels, len(failed_channels))
@@ -345,10 +299,10 @@ def full_sync(sim) -> dict:
 
 
 def start_epg_sync(sim):
-    """在后台线程中启动 EPG 同步任务。
+    """在后台线程中启动 EPG 同步任务（免登录：频道编码来自 live_channels）。
 
     Args:
-        sim: STBSimulator 实例（需已登录）
+        sim: STBSimulator 实例（仅用于 vis_base_url 与请求头，无需登录态）
     """
     global epg_sync_status
     if epg_sync_status["running"]:
