@@ -205,6 +205,9 @@ def init_db():
         "m3u_dual_line": "0",
         "low_quality_filter": "1",  # 低质量视频过滤开关（长标题+无评分=垃圾）
         "m3u8_filter": "1",         # m3u8 内容池过滤开关（JHT/YANHUA/YANKUM）
+        "live_sync_hour": "0",      # 定时直播同步触发钟点（0-23），首次登录也会顺带触发
+        "vod_sync_hour": "1",       # 定时 VOD 同步触发钟点（0-23，免登录）
+        "epg_sync_hour": "1",       # 定时 EPG 同步触发钟点（0-23，免登录）
     }
     for k, v in default_configs.items():
         c.execute("""

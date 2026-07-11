@@ -105,6 +105,7 @@ from src.api.play import set_simulator as set_sim_play, set_login_func as set_lo
 from src.web.routes import set_simulator as set_sim_web, set_login_func
 from src.api.live import set_simulator as set_sim_live, set_login_func as set_login_live
 from src.api.epg import set_simulator as set_sim_epg, set_login_func as set_login_epg
+from src.sync.scheduler import start_scheduler, stop_scheduler
 
 set_sim_tvbox(sim)
 set_login_tvbox(login_sim)
@@ -125,8 +126,10 @@ sim.login_func = login_sim  # 供 simulator 层顶号自愈（_session_request�
 async def lifespan(app: FastAPI):
     # 启动时
     login_sim()
+    start_scheduler(sim, login_sim)
     yield
     # 关闭时
+    stop_scheduler()
 
 
 app = FastAPI(title="IPTV-Toolkit", lifespan=lifespan)
@@ -148,6 +151,10 @@ app.get("/tv.m3u")(generate_m3u)
 # 注册 EPG 路由
 from src.api.epg import router as epg_router
 app.include_router(epg_router)
+
+# 注册调度器状态路由
+from src.api.scheduler import router as scheduler_router
+app.include_router(scheduler_router)
 
 # EPG XML 快捷路由
 from src.api.epg import get_xmltv
