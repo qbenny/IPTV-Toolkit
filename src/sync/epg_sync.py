@@ -24,12 +24,12 @@ def _load_sync_channels(conn) -> dict:
 
     Returns:
         {str(channel_id): {"code": str, "name": str, "tvg_id": str}}
-        只含 channel_code 非空且 source='server' 的频道。
+        只含 channel_code 非空、source='server' 且已启用的频道。
     """
     c = conn.cursor()
     c.execute(
         "SELECT channel_id, channel_code, name, tvg_id FROM live_channels "
-        "WHERE source = 'server' AND channel_code != ''"
+        "WHERE source = 'server' AND channel_code != '' AND is_enabled = 1"
     )
     channels = {}
     for row in c.fetchall():
