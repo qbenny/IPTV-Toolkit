@@ -50,14 +50,6 @@ def _build_tvg_lookup(conn) -> dict:
             lookup[ch_id] = _normalize_epg(display)
     return lookup
 
-# VIS schedules API 地址
-VIS_SCHEDULES_BASE = "http://115.233.200.60:58000/epg/api/schedules/"
-VIS_HEADERS = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept": "*/*",
-    "Connection": "keep-alive",
-}
-
 # 请求间隔（秒）
 _REQUEST_INTERVAL = 0.2
 _MAX_RETRIES = 3
@@ -123,21 +115,24 @@ def get_channel_code_mapping(sim):
         return {}
 
 
-def _fetch_schedule(channel_code: str, begintime: str, endtime: str) -> list:
+def _fetch_schedule(vis_base: str, channel_code: str, begintime: str, endtime: str, headers: dict = None) -> list:
     """拉取单个频道的时间段节目单（带重试）。
+
+    Args:
+        vis_base: VIS 服务器基址（sim.state.vis_base_url，形如 http://ip:port/epg/）
 
     Returns:
         tuple: (programs: list, error: str|None)
             - programs: resultSet 列表，空列表表示无数据（非错误）
             - error: 非空字符串表示请求失败，None 表示成功（包括返回空数据的情况）
     """
-    url = f"{VIS_SCHEDULES_BASE}{channel_code}.json"
+    url = f"{vis_base}api/schedules/{channel_code}.json"
     params = {"begintime": begintime, "endtime": endtime}
 
     last_exc = None
     for attempt in range(_MAX_RETRIES):
         try:
-            res = requests.get(url, params=params, headers=VIS_HEADERS, timeout=15)
+            res = requests.get(url, params=params, headers=headers, timeout=15)
             if res.status_code == 200:
                 return res.json().get("resultSet", []), None
             logger.warning("[EPG Sync] schedules API HTTP %d for code=%s",
@@ -253,6 +248,13 @@ def full_sync(sim) -> dict:
         channel_count=0, program_count=0,
     )
 
+    # VIS 服务器基址（与 filter_sync 统一，均取自登录后解析的地址）
+    vis_base = sim.state.vis_base_url
+    if not vis_base:
+        logger.error("[EPG Sync] VIS 服务器地址未解析，无法同步")
+        _set_epg_status(running=False, last_error="VIS 服务器地址未解析")
+        return {"channel_count": 0, "program_count": 0}
+
     # Step 1: 获取 channelCode 映射
     code_mapping = get_channel_code_mapping(sim)
     if not code_mapping:
@@ -320,7 +322,7 @@ def full_sync(sim) -> dict:
             done=i + 1,
         )
 
-        programs, error = _fetch_schedule(code, begin, tomorrow_str)
+        programs, error = _fetch_schedule(vis_base, code, begin, tomorrow_str, headers=sim.config.headers)
         if error:
             # 网络请求失败 → 进入重试队列
             failed_channels.append((code, info, begin))
@@ -355,7 +357,7 @@ def full_sync(sim) -> dict:
                 epg_chid = tvg_lookup.get(channel_id) or _normalize_epg(channel_name)
 
                 time.sleep(_RETRY_BATCH_INTERVAL)
-                programs, error = _fetch_schedule(code, begin, tomorrow_str)
+                programs, error = _fetch_schedule(vis_base, code, begin, tomorrow_str, headers=sim.config.headers)
                 if error:
                     still_failed.append((code, info, begin))
                 elif programs:

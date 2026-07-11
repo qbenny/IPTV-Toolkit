@@ -10,19 +10,12 @@ import requests
 from src.db.crud import bulk_upsert_items, clean_old_data
 from src.utils.logger import logger
 
-# VIS API 通用请求 headers
-VIS_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.0.3; zh-cn)",
-    "Accept": "*/*",
-    "Connection": "keep-alive",
-}
-
 # 请求重试配置
 _MAX_RETRIES = 3
 _RETRY_DELAY_BASE = 3  # 秒，指数退避基数
 
 
-def _fetch_with_retry(url: str, params: dict, timeout: int = 15) -> requests.Response:
+def _fetch_with_retry(url: str, params: dict, timeout: int = 15, headers: dict = None) -> requests.Response:
     """带指数退避重试的 GET 请求。
 
     Args:
@@ -39,7 +32,7 @@ def _fetch_with_retry(url: str, params: dict, timeout: int = 15) -> requests.Res
     last_exc = None
     for attempt in range(_MAX_RETRIES):
         try:
-            return requests.get(url, params=params, headers=VIS_HEADERS, timeout=timeout)
+            return requests.get(url, params=params, headers=headers, timeout=timeout)
         except requests.RequestException as e:
             last_exc = e
             if attempt < _MAX_RETRIES - 1:
@@ -98,7 +91,7 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
 
     try:
         url = f"{vis_domain}api/search/filter.json"
-        res = _fetch_with_retry(url, params)
+        res = _fetch_with_retry(url, params, headers=simulator.config.headers)
         if res.status_code != 200:
             logger.warning("[Sync] 同步 %s 失败: HTTP %d", type_name, res.status_code)
             return 0
