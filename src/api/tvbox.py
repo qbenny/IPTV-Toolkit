@@ -82,12 +82,13 @@ _QUALITY_FILTER = {
     ]
 }
 
-# 纪录片分类过滤器
+# 纪录片分类过滤器（2548/0602/bastag11577/bastag12849 已核实命名）
 _DOC_SUB_TYPE_FILTER = {
     "key": "sub_type",
     "name": "分类",
     "value": [
         {"n": "全部", "v": ""},
+        {"n": "军事", "v": "0602"},
         {"n": "自然", "v": "0604"},
         {"n": "动物", "v": "0612"},
         {"n": "美食", "v": "0615"},
@@ -95,7 +96,10 @@ _DOC_SUB_TYPE_FILTER = {
         {"n": "历史", "v": "0603"},
         {"n": "社会", "v": "0610"},
         {"n": "探险", "v": "0606"},
-        {"n": "科技", "v": "0607"}
+        {"n": "科技", "v": "0607"},
+        {"n": "灾难", "v": "2548"},
+        {"n": "时政", "v": "bastag11577"},
+        {"n": "央视", "v": "bastag12849"},
     ]
 }
 
@@ -113,6 +117,87 @@ _VARIETY_SUB_TYPE_FILTER = {
         {"n": "情感观察", "v": "0401"},
         {"n": "推理辩论", "v": "0415"},
         {"n": "职场竞演", "v": "2547"}
+    ]
+}
+
+# 新闻栏目过滤器（contentType='series' 的连续播出节目，共 19 条，最有浏览价值）
+_NEWS_COLUMN_FILTER = {
+    "key": "col_type",
+    "name": "新闻栏目",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "新闻栏目", "v": "series"},
+    ]
+}
+
+# 新闻分类过滤器（子标签 ID 来自 VIS contentBaseTags，已用真实库验证）
+#   0203 时政(2778) / 0212 社会(570) 为文档 §五 已确认中文名的主要分类
+_NEWS_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "军事", "v": "0203"},
+        {"n": "社会", "v": "0204"},
+        {"n": "科技", "v": "0205"},
+        {"n": "财经", "v": "0206"},
+        {"n": "法治", "v": "0207"},
+        {"n": "资讯", "v": "0212"},
+    ]
+}
+
+# 体育分类过滤器（0512 游戏(569) / 0513 赛事(17)，真实库验证）
+_SPORTS_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "足球", "v": "0501"},
+        {"n": "篮球", "v": "0502"},
+        {"n": "网球", "v": "0503"},
+        {"n": "游戏", "v": "0512"},
+        {"n": "棋牌", "v": "0513"},
+        {"n": "健康", "v": "bastag12413"},
+        {"n": "钓鱼", "v": "bastag_18495"},
+        {"n": "滑雪", "v": "bastag_18883"},
+    ]
+}
+
+# 体育内容形式过滤器（contentType 精确 50/50：series 栏目 / vod 单集，真实库验证各 732 条）
+_SPORTS_FORM_FILTER = {
+    "key": "col_type",
+    "name": "内容形式",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "栏目", "v": "series"},
+        {"n": "单集", "v": "vod"},
+    ]
+}
+
+# 戏曲分类过滤器（真实库验证）
+_OPERA_SUB_TYPE_FILTER = {
+    "key": "sub_type",
+    "name": "分类",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "京剧", "v": "1501"},
+        {"n": "豫剧", "v": "1507"},
+        {"n": "越剧", "v": "1508"},
+        {"n": "黄梅戏", "v": "1509"},
+        {"n": "昆曲", "v": "bastag7295"},
+        {"n": "婺剧", "v": "bastag12453"},
+        {"n": "绍剧", "v": "bastag9553"},
+    ]
+}
+
+# 戏曲内容形式过滤器（contentType：series 栏目(24) / vod 单集(1558)，真实库验证）
+_OPERA_FORM_FILTER = {
+    "key": "col_type",
+    "name": "内容形式",
+    "value": [
+        {"n": "全部", "v": ""},
+        {"n": "栏目", "v": "series"},
+        {"n": "单集", "v": "vod"},
     ]
 }
 
@@ -134,6 +219,11 @@ FILTER_CONFIG = {
     "anime":       [_COUNTRY_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
     "kids":        [_COUNTRY_FILTER, _YEAR_FILTER, _SORT_FILTER],
     "documentary": [_DOC_SUB_TYPE_FILTER, _YEAR_FILTER, _QUALITY_FILTER, _SORT_FILTER],
+    # 新增大类：子标签过滤器待全量同步后实测 contentBaseTags 再补
+    "opera":       [_OPERA_SUB_TYPE_FILTER, _OPERA_FORM_FILTER, _YEAR_FILTER],
+    "sports":      [_SPORTS_SUB_TYPE_FILTER, _SPORTS_FORM_FILTER, _YEAR_FILTER, _SORT_FILTER],
+    "news":        [_NEWS_SUB_TYPE_FILTER, _NEWS_COLUMN_FILTER, _YEAR_FILTER, _SORT_FILTER],
+    "other":       [_COUNTRY_FILTER, _YEAR_FILTER, _SORT_FILTER],
 }
 
 
@@ -205,7 +295,13 @@ async def get_tvbox_config(request: Request) -> JSONResponse:
                 "playUrl": "json:" + str(request.base_url) + "api/play?vod_id=",
                 "searchable": 1,
                 "quickSearch": 1,
-                "filterable": 1
+                "filterable": 1,
+                # categories：客户端本地过滤显示的分类（按显示名匹配 type_name）。
+                # 不包含「其他」，TVBox 将自动隐藏该分类。
+                "categories": [
+                    "电影专区", "电视剧场", "综艺荟萃", "动漫世界",
+                    "少儿天地", "纪录大观", "戏曲天地", "体育竞技", "新闻速递"
+                ]
             }
         ]
     }
@@ -256,20 +352,81 @@ async def handle_tvbox_request(request: Request) -> JSONResponse:
         result["filters"] = {t: FILTER_CONFIG.get(t, [])}
         return JSONResponse(content={"code": 1, **result})
 
-    # ---------- 场景 4: 初始化 - 返回顶级分类和过滤器 ----------
+    # ---------- 场景 4: 初始化 - 返回顶级分类、过滤器与推荐列表 ----------
     vis_categories = []
     vis_filters = {}
+    rec_list = []
 
     for cat_id, cat_filters in FILTER_CONFIG.items():
         name_map = {
             "movies": "电影专区", "series": "电视剧场",
             "variety": "综艺荟萃", "anime": "动漫世界", "kids": "少儿天地",
-            "documentary": "纪录大观"
+            "documentary": "纪录大观",
+            "opera": "戏曲天地", "sports": "体育竞技", "news": "新闻速递", "other": "其他"
         }
         vis_categories.append({"type_id": cat_id, "type_name": name_map.get(cat_id, cat_id)})
         vis_filters[cat_id] = cat_filters
 
-    return JSONResponse(content={"code": 1, "class": vis_categories, "filters": vis_filters})
+    # 首页推荐列表：按评分降序取高分内容，优先电影/电视剧/综艺/动漫
+    rec_list = _build_recommend_list()
+
+    return JSONResponse(content={
+        "code": 1,
+        "class": vis_categories,
+        "filters": vis_filters,
+        "list": rec_list
+    })
+
+
+def _quality_remark(name: str) -> str:
+    """根据标题判断画质备注：含 4K→4K，含 HD→高清，否则→标清。"""
+    if not name:
+        return "标清"
+    upper = name.upper()
+    if "4K" in upper:
+        return "4K"
+    if "HD" in upper:
+        return "高清"
+    return "标清"
+
+
+def _build_recommend_list() -> list:
+    """构建首页推荐列表。
+
+    直接复用分类列表 filter_items（含 m3u8 池屏蔽 + 低质量过滤、new 排序、
+    vod_id/remarks 拼装），仅在此基础上按分类各取候选后做同名去重
+    （保留最高画质 4K>高清>标清）并按配额截取，返回 TVBox 初始化接口所需的 list 格式。
+    """
+    import re
+
+    # 首页主推 4 大类（TVBox 分类 id → 每类数量），顺序：电视剧/电影/综艺/纪录
+    priority = [("series", 7), ("movies", 7), ("variety", 7), ("documentary", 7)]
+
+    # 画质优先级：值越小优先级越高
+    _QUALITY_ORDER = {"4K": 0, "高清": 1, "标清": 2}
+
+    def _dedup(items):
+        """同名去重，保留最高画质（4K>高清>标清），保持原出现顺序。"""
+        seen = {}
+        out = []
+        for it in items:
+            clean = re.sub(r'^(4K|HD|SD)[-–—]?\s*|\s*[-–—]?(4K|HD|SD)$', '', it["vod_name"])
+            q = _QUALITY_ORDER.get(_quality_remark(it["vod_name"]), 99)
+            if clean not in seen or q < seen[clean][1]:
+                if clean in seen:
+                    out.remove(seen[clean][0])
+                seen[clean] = (it, q)
+                out.append(it)
+        return out
+
+    rec = []
+    for cat_id, limit in priority:
+        # 复用分类列表逻辑取候选（多取以容纳去重后仍满足配额）
+        result = filter_items(cat_id, filters=None, page=1, page_size=limit * 4, sort="new")
+        items = result.get("list", [])
+        rec.extend(_dedup(items)[:limit])
+
+    return rec
 
 
 async def _handle_detail(ids: str, sim) -> JSONResponse:
@@ -322,11 +479,15 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     "vod_id": current_id,
                     "vod_name": name,
                     "vod_pic": pic_url,
-                    "type_name": "电影",
+                    "type_name": db_item.get("type", "") if db_item else "",
                     "vod_content": content,
+                    "vod_year": db_item.get("year", "") if db_item else "",
+                    "vod_area": db_item.get("country", "") if db_item else "",
+                    "vod_actor": db_item.get("actors", "") if db_item else "",
+                    "vod_director": db_item.get("director", "") if db_item else "",
                     "vod_play_from": "电信专线",
                     "vod_play_url": f"播放${play_url}",
-                    "vod_remarks": "高清"
+                    "vod_remarks": _quality_remark(name)
                 })
 
             # C. 电视剧/多集资源
@@ -334,23 +495,27 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                 series_info = sim.get_series_info(vod_id)
                 # 若 EPG 返回 0 集，则该内容实际是单视频(VOD)，回退到 vod 模式
                 if series_info and not series_info.get("episodes"):
-                    logger.info("[TVBox] series 无剧集，回退 vod 模式: %s", item_code)
+                    logger.debug("[TVBox] series 无剧集，回退 vod 模式: %s", item_code)
                     series_info = None
 
                 if not series_info:
                     # 回退为 VOD：直接用 vod_id 请求播放地址
                     db_item = get_item_by_code(item_code)
-                    pic_url = (db_item.get("icon") or db_item.get("poster") or "") if db_item else ""
+                    pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
                     name = db_item.get("title") or item_code
                     detail_list.append({
                         "vod_id": current_id,
                         "vod_name": name,
                         "vod_pic": pic_url,
-                        "type_name": "内容",
+                        "type_name": db_item.get("type", "") if db_item else "",
                         "vod_content": "热播专区",
+                        "vod_year": db_item.get("year", "") if db_item else "",
+                        "vod_area": db_item.get("country", "") if db_item else "",
+                        "vod_actor": db_item.get("actors", "") if db_item else "",
+                        "vod_director": db_item.get("director", "") if db_item else "",
                         "vod_play_from": "电信专线",
                         "vod_play_url": f"播放${vod_id}",
-                        "vod_remarks": "高清"
+                        "vod_remarks": _quality_remark(name)
                     })
                     continue
 
@@ -379,12 +544,7 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     if not num_str or not num_str.isdigit():
                         num_str = str(display_num)
 
-                    telecom_code = ep.get("telecom_code", "")
-                    if telecom_code:
-                        play_url = f"{ep_id}${telecom_code}"
-                    else:
-                        play_url = ep_id
-                    ep_play_urls.append(f"第{num_str}集${play_url}")
+                    ep_play_urls.append(f"第{num_str}集${ep_id}")
 
                 db_item = get_item_by_code(item_code)
                 pic_url = (db_item.get("poster") or db_item.get("icon") or "") if db_item else ""
@@ -392,11 +552,16 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
                     "vod_id": current_id,
                     "vod_name": name,
                     "vod_pic": pic_url,
-                    "type_name": "电视剧",
+                    "type_name": db_item.get("type", "") if db_item else "",
                     "vod_content": content,
+                    "vod_year": db_item.get("year", "") if db_item else "",
+                    "vod_area": db_item.get("country", "") if db_item else "",
+                    "vod_actor": db_item.get("actors", "") if db_item else "",
+                    "vod_director": db_item.get("director", "") if db_item else "",
                     "vod_play_from": "电信专线",
                     "vod_play_url": "#".join(ep_play_urls),
-                    "vod_remarks": f"更新至{len(ep_play_urls)}集" if ep_play_urls else "暂无内容"
+                    "vod_remarks": (f"{_quality_remark(name)} | 更新至{len(ep_play_urls)}集"
+                                    if ep_play_urls else _quality_remark(name))
                 })
 
         except Exception as e:

@@ -32,6 +32,5 @@ readme.md
 AGENTS.md
 docs/
 
-# 废弃的 Python 文件（新架构不再使用）
-run_simulator.py
-vod-api.py
+# 废弃的旧程序（新架构不再使用）
+old/
