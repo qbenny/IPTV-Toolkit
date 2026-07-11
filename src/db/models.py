@@ -17,7 +17,9 @@ def get_db_connection() -> sqlite3.Connection:
         sqlite3.Connection 实例，row_factory 设置为 sqlite3.Row
     """
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    # timeout=30：并发写（同步线程 + API 写）时把写锁等待从默认 5s 提升到 30s，
+    # 减少偶发 "database is locked"；check_same_thread 默认 True（连接不跨线程），安全。
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")

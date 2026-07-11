@@ -45,9 +45,19 @@ def start_heartbeat_thread(simulator, login_func) -> threading.Thread:
     return t
 
 
+# 登录锁：保证并发请求下同一时刻只发起一次认证登录，
+# 避免 is_authenticated==False 时多个线程各自触发 login() 导致重复登录（可能被服务器 BAN）。
+_login_lock = threading.Lock()
+
+
 def ensure_authenticated(simulator, login_func):
     """确保模拟器已认证。如果未认证则自动登录。"""
     # 只要有任何接口请求，即视为活跃
     simulator.state.update_activity()
-    if not simulator.state.is_authenticated:
-        login_func()
+    if simulator.state.is_authenticated:
+        return
+    # 双重检查锁定：仅当确实未认证时才进入登录临界区，
+    # 同一时刻只有一个线程执行 login()，其余并发线程复用同一次登录结果。
+    with _login_lock:
+        if not simulator.state.is_authenticated:
+            login_func()

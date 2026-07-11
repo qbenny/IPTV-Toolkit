@@ -2,6 +2,7 @@
 EPG 数据同步模块 — VIS schedules API → SQLite epg_programs 表。
 从 VIS 节目单服务器拉取全频道节目数据，按 backTime 分档决定同步天数。
 """
+import concurrent.futures
 import json
 import threading
 import time
@@ -15,46 +16,27 @@ from src.utils.helpers import fetch_with_retry
 from src.utils.logger import logger
 
 
-def _normalize_epg(name: str) -> str:
-    """频道名归一化（fallback 版本，仅在 live_channels 无 tvg_id 时使用）。"""
-    import re
-    name = name.strip()
-    for sfx in ["1080P", "720P", "超清", "高清", "标清", "极清", "FHD", "UHD", "HD", "SD", "4K", "8K"]:
-        if name.endswith(sfx) and len(name) > len(sfx):
-            name = name[:-len(sfx)]
-            break
-    m = re.match(r"(CCTV[\d]+[\+]?)", name)
-    if m:
-        return m.group(1)
-    return name.strip()
-
-
 def _build_tvg_lookup(conn) -> dict:
     """从 live_channels 表构建 channel_id → tvg_id 映射。
 
-    优先使用 live_channels 中已设置的 tvg_id，
-    否则用 display_name 归一化作为 tvg_id。
+    live_channels 的 tvg_id 始终存在，直接取用（与 M3U 同源，保证播放器匹配）。
+    某 channel_id 查不到 tvg_id 时，worker 会回退到服务器原始频道名。
 
     Returns:
-        {str(channel_id): str(epg_channel_id)}
+        {str(channel_id): str(tvg_id)}
     """
     c = conn.cursor()
-    c.execute("SELECT channel_id, tvg_id, display_name, name FROM live_channels")
+    c.execute("SELECT channel_id, tvg_id FROM live_channels")
     lookup = {}
     for row in c.fetchall():
         ch_id = str(row["channel_id"])
         tvg = (row["tvg_id"] or "").strip()
-        display = (row["display_name"] or row["name"] or "").strip()
         if tvg:
             lookup[ch_id] = tvg
-        elif display:
-            lookup[ch_id] = _normalize_epg(display)
     return lookup
 
-# 请求间隔（秒）
-_REQUEST_INTERVAL = 0.2
-_RETRY_BATCH_INTERVAL = 2  # 第二轮重试的延迟（秒）
-_MAX_BATCH_RETRIES = 2     # 第二轮整体重试次数
+# 第二轮整体并发重试次数（不再串行 sleep，间隔由线程池并发度控制）
+_MAX_BATCH_RETRIES = 2
 
 # 同步状态
 epg_sync_status = {
@@ -140,27 +122,6 @@ def _fetch_schedule(vis_base: str, channel_code: str, begintime: str, endtime: s
                    res.status_code, channel_code)
     return [], f"HTTP {res.status_code}"
 
-
-def _dedup_channels(code_mapping: dict) -> dict:
-    """对频道按 channelCode 去重，同一 code 只保留一个。
-
-    同频道 HD/SD 共享 channelCode，只同步一次。
-
-    Returns:
-        {channel_code: {"channel_id": str, "backTime": int, "name": str}}
-    """
-    dedup = {}
-    for cid, info in code_mapping.items():
-        code = info["code"]
-        if not code:
-            continue
-        if code not in dedup:
-            dedup[code] = {
-                "channel_id": cid,
-                "backTime": info["backTime"],
-                "name": info["name"],
-            }
-    return dedup
 
 
 def _upsert_programs(conn, programs: list, channel_id: str, channel_name: str,
@@ -265,105 +226,105 @@ def full_sync(sim) -> dict:
     conn_bt.commit()
     conn_bt.close()
 
-    # Step 2: 去重
-    dedup = _dedup_channels(code_mapping)
-    total_channels = len(dedup)
-    logger.info("[EPG Sync] 去重后 %d 个唯一频道待同步", total_channels)
+    # Step 2: 确定待同步频道总数（直接用服务器返回的频道映射，不做去重）
+    total_channels = len(code_mapping)
+    logger.info("[EPG Sync] %d 个频道待同步", total_channels)
 
     _set_epg_status(total=total_channels, progress="开始同步节目数据...")
 
-    # Step 3: 逐频道同步（跳过 EPG 已覆盖的 HD/SD 共享频道）
+    # Step 3: 并发逐频道同步（线程池拉取 VIS schedules，每个 worker 独立 DB 连接）
+    # 同步所有频道，每个频道独立写库（无跨频道合并）。
+    # epg_channel_id 取自 live_channels.tvg_id —— HD/SD/4K 兄弟频道在 live_channels
+    # 里被配成同一 tvg_id，因此会写入同一个 epg_channel_id；"落库多条但 tvg_id 归并"
+    # 正是这个原因。XMLTV 生成时按 tvg_id + 时段去重，播放器侧不会看到重复节目。
+    # 仅当某 channel_id 在 live_channels 中查不到 tvg_id 时，才回退到服务器原始频道名。
     today = datetime.now()
-    today_str = today.strftime("%Y%m%d")
     tomorrow_str = (today + timedelta(days=1)).strftime("%Y%m%d")
+    begin = (today - timedelta(days=7)).strftime("%Y%m%d")  # 所有频道统一同步范围
 
     conn = get_db_connection()
     sync_time = int(time.time())
     total_programs = 0
     ok_channels = 0
     no_data_channels = 0
-    skipped_shared = 0   # 因EPG共享而跳过的频道
-    failed_channels = []  # 仅记录网络请求失败的频道
+    failed_channels = []  # 仅记录网络请求失败的频道（(code, info)）
 
     # 从 live_channels 获取 channel_id → tvg_id 映射（与 M3U 同一来源，确保匹配）
     tvg_lookup = _build_tvg_lookup(conn)
 
-    # 收集本次同步中已处理的 EPG channel ID（防止 HD/SD 双写）
-    synced_epg_ids = set()
+    headers = sim.config.headers
 
-    for i, (code, info) in enumerate(dedup.items()):
+    def _worker(code, channel_id, info):
+        """单个频道同步 worker：拉取 → 独立连接写库。返回 (status, count, name)。"""
         channel_name = info["name"]
-        channel_id = info["channel_id"]
-        back_time = info["backTime"]
-
-        # 优先用 live_channels 的 tvg_id，保证与 M3U 完全一致
-        epg_chid = tvg_lookup.get(channel_id) or _normalize_epg(channel_name)
-
-        # 如果同一 EPG ID 已经在本轮同步过 → 跳过（HD/SD 共享）
-        if epg_chid in synced_epg_ids:
-            skipped_shared += 1
-            logger.debug("[EPG Sync] %s: 跳过(EPG '%s' 已由其他画质版本同步)", channel_name, epg_chid)
-            continue
-
-        # 计算日期范围：所有频道一律同步过去7天至明天的节目单
-        begin = (today - timedelta(days=7)).strftime("%Y%m%d")
-
-        _set_epg_status(
-            progress=f"[{i+1}/{total_channels}] {channel_name}",
-            current_channel=channel_name,
-            done=i + 1,
-        )
-
-        programs, error = _fetch_schedule(vis_base, code, begin, tomorrow_str, headers=sim.config.headers)
+        # epg_channel_id 优先取 live_channels.tvg_id（与 M3U 同源，保证播放器匹配）；
+        # HD/SD/4K 兄弟频道因此共享同一 epg_channel_id。仅当该 channel_id 在
+        # live_channels 中查不到 tvg_id 时，才回退到服务器原始频道名（不归一化）。
+        epg_chid = tvg_lookup.get(channel_id) or channel_name
+        programs, error = _fetch_schedule(vis_base, code, begin, tomorrow_str, headers=headers)
         if error:
-            # 网络请求失败 → 进入重试队列
-            failed_channels.append((code, info, begin))
-            logger.debug("[EPG Sync] %s: 请求失败 (%s)", channel_name, error)
-        elif programs:
-            count = _upsert_programs(conn, programs, channel_id, channel_name, epg_chid, sync_time)
-            total_programs += count
-            ok_channels += 1
-            synced_epg_ids.add(epg_chid)  # 标记此 EPG ID 已覆盖
-            logger.debug("[EPG Sync] %s: %d 条节目 (backTime=%d)", channel_name, count, back_time)
-        else:
-            # 接口正常返回但无数据（广播、4K、测试频道等）
-            no_data_channels += 1
+            return ("failed", 0, channel_name)
+        if not programs:
+            return ("nodata", 0, channel_name)
+        wconn = get_db_connection()
+        try:
+            count = _upsert_programs(wconn, programs, channel_id, channel_name, epg_chid, sync_time)
+        finally:
+            wconn.close()
+        return ("ok", count, channel_name)
 
-        time.sleep(_REQUEST_INTERVAL)
+    def _drain(executor, task_list, count_progress=True):
+        """提交一批任务并在主线程汇总进度，返回仍失败的 (cid, info) 列表（供下一轮重试）。"""
+        nonlocal total_programs, ok_channels, no_data_channels, done_count
+        futures = {
+            executor.submit(_worker, info["code"], cid, info): (cid, info)
+            for cid, info in task_list
+        }
+        remaining = []
+        for future in concurrent.futures.as_completed(futures):
+            cid, info = futures[future]
+            if count_progress:
+                done_count += 1
+            try:
+                status, count, name = future.result()
+            except Exception as e:
+                logger.warning("[EPG Sync] worker 异常 (%s): %s", info["name"], e)
+                status, count, name = "failed", 0, info["name"]
+            _set_epg_status(
+                progress=f"[{done_count}/{total_channels}] {name}" + ("" if count_progress else " (重试)"),
+                current_channel=name,
+                done=done_count,
+            )
+            if status == "ok":
+                total_programs += count
+                ok_channels += 1
+            elif status == "nodata":
+                no_data_channels += 1
+            elif status == "failed":
+                remaining.append((cid, info))
+        return remaining
 
-    logger.info("[EPG Sync] 第一轮: %d 有数据, %d 无EPG, %d EPG共享跳过, %d 请求失败",
-                ok_channels, no_data_channels, skipped_shared, len(failed_channels))
+    done_count = 0
 
-    # 第二轮：只重试网络请求失败的频道
+    # 第一轮：全量并发拉取（max_workers=5，不加额外限流）
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        failed_channels = _drain(executor, list(code_mapping.items()))
+
+    logger.info("[EPG Sync] 第一轮: %d 有数据, %d 无EPG, %d 请求失败",
+                ok_channels, no_data_channels, len(failed_channels))
+
+    # 第二轮：只并发重试网络请求失败的频道
+    for retry_round in range(_MAX_BATCH_RETRIES):
+        if not failed_channels:
+            break
+        logger.info("[EPG Sync] 第 2 轮重试 %d 个失败频道 (第 %d/%d 次)",
+                    len(failed_channels), retry_round + 1, _MAX_BATCH_RETRIES)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            failed_channels = _drain(executor, failed_channels, count_progress=False)
+
     if failed_channels:
-        for retry_round in range(_MAX_BATCH_RETRIES):
-            if not failed_channels:
-                break
-            logger.info("[EPG Sync] 第 2 轮重试 %d 个失败频道 (第 %d/%d 次)",
-                        len(failed_channels), retry_round + 1, _MAX_BATCH_RETRIES)
-            still_failed = []
-            for code, info, begin in failed_channels:
-                channel_name = info["name"]
-                channel_id = info["channel_id"]
-                back_time = info["backTime"]
-                epg_chid = tvg_lookup.get(channel_id) or _normalize_epg(channel_name)
-
-                time.sleep(_RETRY_BATCH_INTERVAL)
-                programs, error = _fetch_schedule(vis_base, code, begin, tomorrow_str, headers=sim.config.headers)
-                if error:
-                    still_failed.append((code, info, begin))
-                elif programs:
-                    count = _upsert_programs(conn, programs, channel_id, channel_name, epg_chid, sync_time)
-                    total_programs += count
-                    ok_channels += 1
-                    logger.info("[EPG Sync] 重试成功: %s (%d 条)", channel_name, count)
-                else:
-                    no_data_channels += 1  # 重试后发现确实无数据
-            failed_channels = still_failed
-
-        if failed_channels:
-            names = [info["name"] for _, info, _ in failed_channels]
-            logger.warning("[EPG Sync] 最终网络失败 %d 个频道: %s", len(failed_channels), ", ".join(names))
+        names = [info["name"] for _, info in failed_channels]
+        logger.warning("[EPG Sync] 最终网络失败 %d 个频道: %s", len(failed_channels), ", ".join(names))
 
     # Step 4: 清理过期
     _clean_expired(conn)
@@ -378,8 +339,8 @@ def full_sync(sim) -> dict:
         program_count=total_programs,
     )
 
-    logger.info("[EPG Sync] 完成: %d 频道有数据 (%d 条节目), %d 无EPG, %d EPG共享跳过, %d 网络失败",
-                ok_channels, total_programs, no_data_channels, skipped_shared, len(failed_channels))
+    logger.info("[EPG Sync] 完成: %d 频道有数据 (%d 条节目), %d 无EPG, %d 网络失败",
+                ok_channels, total_programs, no_data_channels, len(failed_channels))
     return {"channel_count": ok_channels, "program_count": total_programs, "no_data": no_data_channels}
 
 
