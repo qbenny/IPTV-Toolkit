@@ -5,42 +5,9 @@
 import threading
 import time
 
-import requests
-
 from src.db.crud import bulk_upsert_items, clean_old_data
+from src.utils.helpers import fetch_with_retry
 from src.utils.logger import logger
-
-# 请求重试配置
-_MAX_RETRIES = 3
-_RETRY_DELAY_BASE = 3  # 秒，指数退避基数
-
-
-def _fetch_with_retry(url: str, params: dict, timeout: int = 15, headers: dict = None) -> requests.Response:
-    """带指数退避重试的 GET 请求。
-
-    Args:
-        url: 请求地址
-        params: 查询参数
-        timeout: 单次超时秒数
-
-    Returns:
-        requests.Response
-
-    Raises:
-        requests.RequestException: 重试耗尽后抛出最后一次异常
-    """
-    last_exc = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            return requests.get(url, params=params, headers=headers, timeout=timeout)
-        except requests.RequestException as e:
-            last_exc = e
-            if attempt < _MAX_RETRIES - 1:
-                delay = _RETRY_DELAY_BASE * (2 ** attempt)
-                logger.warning("[Sync] 请求失败 (尝试 %d/%d)，%d 秒后重试: %s",
-                               attempt + 1, _MAX_RETRIES, delay, e)
-                time.sleep(delay)
-    raise last_exc
 
 # 同步状态（供 Web UI 查询）
 sync_status = {
@@ -91,7 +58,7 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
 
     try:
         url = f"{vis_domain}api/search/filter.json"
-        res = _fetch_with_retry(url, params, headers=simulator.config.headers)
+        res = fetch_with_retry(url, params, headers=simulator.config.headers, tag="Sync")
         if res.status_code != 200:
             logger.warning("[Sync] 同步 %s 失败: HTTP %d", type_name, res.status_code)
             return 0

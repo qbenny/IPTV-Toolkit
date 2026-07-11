@@ -11,6 +11,7 @@ import requests
 
 from src.db.models import get_db_connection
 from src.utils.helpers import parse_epg_json
+from src.utils.helpers import fetch_with_retry
 from src.utils.logger import logger
 
 
@@ -52,8 +53,6 @@ def _build_tvg_lookup(conn) -> dict:
 
 # 请求间隔（秒）
 _REQUEST_INTERVAL = 0.2
-_MAX_RETRIES = 3
-_RETRY_DELAY_BASE = 3
 _RETRY_BATCH_INTERVAL = 2  # 第二轮重试的延迟（秒）
 _MAX_BATCH_RETRIES = 2     # 第二轮整体重试次数
 
@@ -129,24 +128,17 @@ def _fetch_schedule(vis_base: str, channel_code: str, begintime: str, endtime: s
     url = f"{vis_base}api/schedules/{channel_code}.json"
     params = {"begintime": begintime, "endtime": endtime}
 
-    last_exc = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            res = requests.get(url, params=params, headers=headers, timeout=15)
-            if res.status_code == 200:
-                return res.json().get("resultSet", []), None
-            logger.warning("[EPG Sync] schedules API HTTP %d for code=%s",
-                           res.status_code, channel_code)
-            return [], f"HTTP {res.status_code}"
-        except requests.RequestException as e:
-            last_exc = e
-            if attempt < _MAX_RETRIES - 1:
-                delay = _RETRY_DELAY_BASE * (2 ** attempt)
-                logger.warning("[EPG Sync] 请求失败 (尝试 %d/%d)，%d 秒后重试: %s",
-                               attempt + 1, _MAX_RETRIES, delay, e)
-                time.sleep(delay)
-    logger.error("[EPG Sync] 请求耗尽重试: %s", last_exc)
-    return [], str(last_exc)
+    try:
+        res = fetch_with_retry(url, params=params, headers=headers, timeout=15, tag="EPG Sync")
+    except requests.RequestException as e:
+        logger.error("[EPG Sync] 请求耗尽重试: %s", e)
+        return [], str(e)
+
+    if res.status_code == 200:
+        return res.json().get("resultSet", []), None
+    logger.warning("[EPG Sync] schedules API HTTP %d for code=%s",
+                   res.status_code, channel_code)
+    return [], f"HTTP {res.status_code}"
 
 
 def _dedup_channels(code_mapping: dict) -> dict:

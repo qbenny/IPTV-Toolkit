@@ -1,5 +1,5 @@
 """
-工具函数模块 - 包含 EPG JSON 解析、IPTV IP 探测等工具函数。
+工具函数模块 - 包含 EPG JSON 解析、IPTV IP 探测、带重试的 HTTP GET 等工具函数。
 从 run_simulator.py 迁移而来。
 """
 import ast
@@ -7,10 +7,59 @@ import json
 import re
 import subprocess
 import sys
+import time
 
 import requests
 
+from src.utils.logger import logger
+
 _IPTV_IP_DETECT_URL = "http://192.168.1.1/iptv_ip.txt"
+
+# HTTP 重试默认配置
+_DEFAULT_MAX_RETRIES = 3
+_DEFAULT_RETRY_DELAY_BASE = 3  # 秒，指数退避基数
+
+
+def fetch_with_retry(
+    url: str,
+    params: dict = None,
+    timeout: int = 15,
+    max_retries: int = _DEFAULT_MAX_RETRIES,
+    headers: dict = None,
+    retry_delay_base: int = _DEFAULT_RETRY_DELAY_BASE,
+    tag: str = "HTTP",
+) -> requests.Response:
+    """带指数退避重试的 GET 请求。
+
+    仅对网络层异常（requests.RequestException）重试；HTTP 状态码由调用方自行判断。
+
+    Args:
+        url: 请求地址
+        params: 查询参数
+        timeout: 单次超时秒数
+        max_retries: 最大尝试次数
+        headers: 请求头
+        retry_delay_base: 指数退避基数（秒），第 n 次重试等待 base * 2**n
+        tag: 日志标签（用于区分调用来源，如 "Sync" / "EPG Sync"）
+
+    Returns:
+        requests.Response
+
+    Raises:
+        requests.RequestException: 重试耗尽后抛出最后一次异常
+    """
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            return requests.get(url, params=params, headers=headers, timeout=timeout)
+        except requests.RequestException as e:
+            last_exc = e
+            if attempt < max_retries - 1:
+                delay = retry_delay_base * (2 ** attempt)
+                logger.warning("[%s] 请求失败 (尝试 %d/%d)，%d 秒后重试: %s",
+                               tag, attempt + 1, max_retries, delay, e)
+                time.sleep(delay)
+    raise last_exc
 
 
 def parse_epg_json(text: str) -> dict:
