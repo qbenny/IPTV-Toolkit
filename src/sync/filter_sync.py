@@ -2,9 +2,11 @@
 数据同步模块 - filter.json -> SQLite 同步逻辑。
 从 VIS API 分页拉取全量数据并写入本地数据库。
 """
+import concurrent.futures
 import threading
 import time
 
+from src.auth.heartbeat import ensure_authenticated
 from src.db.crud import bulk_upsert_items, clean_old_data
 from src.utils.helpers import fetch_with_retry
 from src.utils.logger import logger
@@ -58,25 +60,26 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
 
     try:
         url = f"{vis_domain}api/search/filter.json"
+        t_net = time.perf_counter()
         res = fetch_with_retry(url, params, headers=simulator.config.headers, tag="Sync")
         if res.status_code != 200:
             logger.warning("[Sync] 同步 %s 失败: HTTP %d", type_name, res.status_code)
             return 0
+        dt_net = time.perf_counter() - t_net
 
+        t_parse = time.perf_counter()
         data = res.json()
         items = data.get("resultSet", [])
         if not items:
-            logger.warning("[Sync] %s 返回空数据", type_name)
+            logger.warning("[Sync] %s 返回空数据 (网络=%.2fs)", type_name, dt_net)
             return 0
+        dt_parse = time.perf_counter() - t_parse
 
+        t_write = time.perf_counter()
         count = bulk_upsert_items(items, type_name, sync_time)
-        logger.info("[Sync] %s: 写入 %d 条", type_name, count)
-
-        _set_sync_status(
-            progress=f"{type_name} ({count} 条)",
-            current_type=type_name,
-            done=count,
-        )
+        dt_write = time.perf_counter() - t_write
+        logger.info("[Sync] %s: 写入 %d 条 | 网络=%.2fs 解析=%.2fs 写库=%.2fs",
+                    type_name, count, dt_net, dt_parse, dt_write)
 
     except Exception as e:
         logger.error("[Sync] 同步 %s 异常: %s", type_name, e)
@@ -87,11 +90,15 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
     return count
 
 
-def full_sync(simulator) -> dict:
+def full_sync(simulator, login_func=None) -> dict:
     """全量同步所有类型的 filter.json 数据到 SQLite。
 
+    各类型并发拉取（线程池），墙钟耗时由最慢单类决定；写库各自独立连接（WAL），
+    并发安全。并发前仅做一次认证，避免 10 个线程各自触发登录。
+
     Args:
-        simulator: STBSimulator 实例（需已登录）
+        simulator: STBSimulator 实例
+        login_func: 登录函数（用于并发前确保已认证；为 None 时跳过）
 
     Returns:
         {"type_name": count, ...}
@@ -112,11 +119,37 @@ def full_sync(simulator) -> dict:
         results={},
     )
 
+    # 并发前确保已认证（单次；若已认证则 ensure_authenticated 直接返回，无额外开销）
+    if login_func:
+        try:
+            ensure_authenticated(simulator, login_func)
+        except Exception as e:
+            logger.error("[Sync] 同步前认证失败: %s", e)
+            _set_sync_status(running=False, last_error=str(e))
+            return {}
+
     results = {}
-    for t in types:
-        _set_sync_status(current_type=t)
-        count = sync_filter_data(simulator, t, sync_time)
-        results[t] = count
+    done_total = 0
+    # 并发拉取 10 个类型：墙钟由最慢单类（电视剧）决定，5 路已足够且减轻服务器压力
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_type = {
+            executor.submit(sync_filter_data, simulator, t, sync_time): t
+            for t in types
+        }
+        for future in concurrent.futures.as_completed(future_to_type):
+            t = future_to_type[future]
+            try:
+                count = future.result()
+            except Exception as e:
+                logger.error("[Sync] %s 同步异常: %s", t, e)
+                count = 0
+            results[t] = count
+            done_total += count
+            _set_sync_status(
+                current_type=t,
+                done=done_total,
+                progress=f"{t} 完成 ({count} 条)",
+            )
 
     # 所有类型同步完成后，清理过期数据
     _set_sync_status(progress="清理旧数据...", current_type="清理中")
@@ -136,11 +169,12 @@ def full_sync(simulator) -> dict:
     return results
 
 
-def start_sync_background(simulator):
+def start_sync_background(simulator, login_func=None):
     """在后台线程中启动同步任务。
 
     Args:
         simulator: STBSimulator 实例
+        login_func: 登录函数（透传给 full_sync，用于并发前确保已认证）
     """
     global sync_status
     if sync_status["running"]:
@@ -149,7 +183,7 @@ def start_sync_background(simulator):
 
     def _run():
         try:
-            full_sync(simulator)
+            full_sync(simulator, login_func)
         except Exception as e:
             logger.error("[Sync] 同步任务异常: %s", e, exc_info=True)
             _set_sync_status(running=False, last_error=str(e))

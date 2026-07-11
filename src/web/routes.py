@@ -140,7 +140,7 @@ async def trigger_sync():
     if _simulator is None or not _simulator.state.is_authenticated:
         return JSONResponse(content={"status": "error", "message": "模拟器未认证，请先配置并登录 STB"})
 
-    start_sync_background(_simulator)
+    start_sync_background(_simulator, _login_func)
     return {"status": "started", "message": "已开始同步数据，请稍候查看进度..."}
 
 
