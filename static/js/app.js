@@ -1,6 +1,6 @@
 /**
  * IPTV-Toolkit v2.0 前端逻辑
- * - 系统凭证配置
+ * - 系统配置
  * - 数据同步管理
  * - 系统日志查看
  */
@@ -17,14 +17,14 @@ const app = createApp({
 
             // Tab info
             tabTitles: {
-                stb: '系统凭证配置',
+                stb: '系统配置',
                 sync: '数据同步管理',
                 live: '直播频道管理',
                 epg: 'EPG 节目管理',
                 log: '系统日志'
             },
             tabSubtitles: {
-                stb: '配置电信机顶盒仿真认证参数，保障安全接入 EPG 网关',
+                stb: '管理机顶盒仿真认证凭证与定时同步任务',
                 sync: '从 VIS API 同步点播数据到本地 SQLite 数据库',
                 live: '管理直播频道、分类、外部导入，生成 M3U 订阅',
                 epg: '从 VIS 节目单 API 同步 EPG 数据，生成 XMLTV',
@@ -40,6 +40,12 @@ const app = createApp({
             savingStb: false,
             simStatus: { is_authenticated: false, epg_base_url: null, user_token: null, jsessionid: null },
             simStatusTimer: null,
+
+            // Plate 1: 定时同步设置
+            schedulerConfig: { live_sync_hour: 0, vod_sync_hour: 1, epg_sync_hour: 1 },
+            schedulerStatus: { running: false, config: {}, tasks: {} },
+            savingScheduler: false,
+            taskLabels: { live: '直播频道', vod: 'VOD 点播', epg: 'EPG 节目单' },
 
             // Plate 2: Sync
             syncStatus: {
@@ -155,6 +161,8 @@ const app = createApp({
             this.fetchSimStatus(); // Refresh auth status on tab switch
             if (newTab === 'stb') {
                 this.startSimStatusPolling();
+                this.fetchSchedulerConfig();
+                this.fetchSchedulerStatus();
             } else if (newTab === 'log') {
                 this.startLogPolling();
             } else if (newTab === 'sync') {
@@ -191,6 +199,8 @@ const app = createApp({
         this.fetchDbStats();
         this.fetchSimStatus(); // Initial fetch of auth status globally
         this.fetchVodConfig();  // 加载 VOD 过滤设置（独立于 liveConfig）
+        this.fetchSchedulerConfig();  // 加载定时同步钟点配置
+        this.fetchSchedulerStatus();  // 加载调度器运行状态
         if (this.activeTab === 'stb') {
             this.startSimStatusPolling();
         } else if (this.activeTab === 'live') {
@@ -454,6 +464,49 @@ const app = createApp({
             } catch (e) {
                 this.showToast('通信异常', 'error');
             } finally { this.savingStb = false; }
+        },
+
+        // ---- 定时同步设置（钟点存于 live_config，状态来自调度器）----
+        async fetchSchedulerConfig() {
+            try {
+                const r = await fetch('/api/live/config');
+                const c = await r.json();
+                this.schedulerConfig = {
+                    live_sync_hour: parseInt(c.live_sync_hour ?? 0) || 0,
+                    vod_sync_hour: parseInt(c.vod_sync_hour ?? 1) || 0,
+                    epg_sync_hour: parseInt(c.epg_sync_hour ?? 1) || 0
+                };
+            } catch (e) { /* silent */ }
+        },
+
+        async fetchSchedulerStatus() {
+            try {
+                const r = await fetch('/api/scheduler/status');
+                if (r.ok) this.schedulerStatus = await r.json();
+            } catch (e) { /* silent */ }
+        },
+
+        async saveSchedulerConfig() {
+            this.savingScheduler = true;
+            try {
+                const r = await fetch('/api/live/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        live_sync_hour: String(this.schedulerConfig.live_sync_hour),
+                        vod_sync_hour: String(this.schedulerConfig.vod_sync_hour),
+                        epg_sync_hour: String(this.schedulerConfig.epg_sync_hour)
+                    })
+                });
+                if (r.ok) {
+                    this.showToast('定时设置已保存，即时生效');
+                    this.fetchSchedulerStatus();
+                } else {
+                    this.showToast('保存失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            } finally { this.savingScheduler = false; }
         },
 
         // ---- Sync ----

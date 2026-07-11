@@ -98,6 +98,25 @@ def _live_synced_today() -> bool:
         return False
 
 
+def _db_sync_time(name: str) -> int:
+    """查 DB 中某类型最近一次成功同步的时间戳（vod/epg 全量同步会写入对应时间列）。"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        if name == "vod":
+            c.execute("SELECT MAX(syncedAt) AS m FROM vod_items")
+        elif name == "epg":
+            c.execute("SELECT MAX(synced_at) AS m FROM epg_programs")
+        else:
+            conn.close()
+            return 0
+        row = c.fetchone()
+        conn.close()
+        return row["m"] if row and row["m"] else 0
+    except Exception:
+        return 0
+
+
 def _date_of(ts: int) -> date:
     return date.fromtimestamp(ts) if ts else None
 
@@ -220,7 +239,8 @@ def _trigger_live(force_login: bool):
 
 def _check_async(name, now, today, hour, status, cap):
     st = _state[name]
-    last_ts = status.get("last_sync_time", 0)
+    # 今天是否已同步：DB 已落库（重启后仍可判定）或本次进程内内存记录，取较新者
+    last_ts = max(_db_sync_time(name), status.get("last_sync_time") or 0)
     if _date_of(last_ts) == today:
         st["done_today"] = True
     if st["done_today"] or st["gave_up"]:
@@ -315,7 +335,7 @@ def _task_last_sync_time(name: str):
         except Exception:
             return 0
     if name == "vod":
-        return sync_status.get("last_sync_time", 0)
+        return max(_db_sync_time("vod"), sync_status.get("last_sync_time") or 0)
     if name == "epg":
-        return epg_sync_status.get("last_sync_time", 0)
+        return max(_db_sync_time("epg"), epg_sync_status.get("last_sync_time") or 0)
     return 0
