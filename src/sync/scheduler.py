@@ -243,6 +243,9 @@ def _check_async(name, now, today, hour, status, cap):
     last_ts = max(_db_sync_time(name), status.get("last_sync_time") or 0)
     if _date_of(last_ts) == today:
         st["done_today"] = True
+        # 已确认今天完成：清除 pending，否则 _sync_busy() 会一直为真、挡住另一个任务
+        st["pending"] = False
+        st["retrying"] = False
     if st["done_today"] or st["gave_up"]:
         return
     if st["pending"]:
