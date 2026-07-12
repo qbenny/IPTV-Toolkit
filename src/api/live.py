@@ -419,7 +419,9 @@ async def get_channels(
     
     query = f"""
         SELECT c.*, cat.name as category_name, cat.color as category_color,
-               (SELECT COUNT(DISTINCT program_date) FROM epg_programs WHERE channel_id = c.channel_id OR (c.tvg_id != '' AND epg_channel_id = c.tvg_id)) as epg_days
+               (SELECT COUNT(DISTINCT program_date) FROM epg_programs
+                  WHERE (c.channel_id != '' AND channel_id = c.channel_id)
+                     OR (c.tvg_id != '' AND epg_channel_id = c.tvg_id)) as epg_days
         FROM live_channels c
         LEFT JOIN live_categories cat ON c.category_id = cat.id
         {where_str}
@@ -1003,7 +1005,10 @@ async def import_channels(
         
     conn = get_db_connection()
     c = conn.cursor()
-    
+
+    # 加载别名映射，导入外部频道时即应用规范名
+    alias_map = get_alias_map()
+
     c.execute("SELECT channel_id, multicast_url FROM live_channels")
     existing_rows = c.fetchall()
     
@@ -1071,13 +1076,21 @@ async def import_channels(
             continue
             
         category_id = resolve_category(group_title)
-        tvg_id = item.get("tvg_id", name) or name
-        tvg_name = item.get("tvg_name", name) or name
-        logo_url = item.get("logo_url", "")
-        display_name = name
-        
-        if logo_url:
-            logo_url = os.path.basename(logo_url)
+        # 应用别名映射：命中则用规范名推导 tvg_id/tvg_name/logo_url
+        alias_target = alias_map.get(name)
+        if alias_target:
+            display_name = alias_target
+            base_epg = normalize_epg(alias_target)
+            tvg_id = base_epg
+            tvg_name = base_epg
+            logo_url = normalize_logo(alias_target) + ".png"
+        else:
+            tvg_id = item.get("tvg_id", name) or name
+            tvg_name = item.get("tvg_name", name) or name
+            display_name = name
+            logo_url = item.get("logo_url", "")
+            if logo_url:
+                logo_url = os.path.basename(logo_url)
             
         c.execute("""
             INSERT INTO live_channels (
@@ -1118,11 +1131,15 @@ def _apply_alias_to_channels(c, source_name: str, target_name: str) -> int:
 
     Args:
         c: 数据库 cursor
-        source_name: 服务器原始名称
+        source_name: 频道原始名称（name 字段）
         target_name: 规范名称
 
     Returns:
         受影响的频道数量
+
+    注意：server 与 external 频道都会命中——server 频道在同步时已通过
+    resolve_channel_names 应用别名；external 频道（外部导入）不同步，
+    只能靠此处（添加/导入时）应用，故不可限定 source='server'。
     """
     display_name = target_name
     base_epg = normalize_epg(target_name)
@@ -1131,7 +1148,7 @@ def _apply_alias_to_channels(c, source_name: str, target_name: str) -> int:
     c.execute("""
         UPDATE live_channels
         SET display_name = ?, tvg_id = ?, tvg_name = ?, logo_url = ?
-        WHERE name = ? AND source = 'server'
+        WHERE name = ?
     """, (display_name, base_epg, base_epg, base_logo + ".png", source_name))
     return c.rowcount
 
@@ -1215,7 +1232,7 @@ async def update_alias(id: int, data: dict):
     # 如果原名改了，旧名的频道回退为原始值
     if old_source and old_source != source_name:
         c.execute(
-            "UPDATE live_channels SET display_name = name WHERE name = ? AND source = 'server'",
+            "UPDATE live_channels SET display_name = name WHERE name = ?",
             (old_source,)
         )
 
@@ -1241,7 +1258,7 @@ async def delete_alias(id: int):
     # 回退匹配频道的 display_name 为原始 name
     if source_name:
         c.execute(
-            "UPDATE live_channels SET display_name = name WHERE name = ? AND source = 'server'",
+            "UPDATE live_channels SET display_name = name WHERE name = ?",
             (source_name,)
         )
 

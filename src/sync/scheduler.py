@@ -20,7 +20,8 @@ from src.db.models import get_db_connection
 from src.utils.logger import logger
 from src.api.live import run_live_sync, live_sync_status, get_live_configs
 from src.sync.filter_sync import start_sync_background, sync_status
-from src.sync.epg_sync import start_epg_sync, epg_sync_status
+from src.sync.epg_sync import start_epg_sync
+from src.sync.epg_status import epg_sync_status
 
 # 当日重试上限
 LIVE_LOGIN_CAP = 3     # 直播“强制登录兜底”的登录尝试上限（防 VIS 长时间不可达被 BAN）

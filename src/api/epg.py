@@ -7,7 +7,8 @@ from fastapi import APIRouter, Query, Response
 from fastapi.responses import JSONResponse
 
 from src.db.models import get_db_connection
-from src.sync.epg_sync import epg_sync_status, start_epg_sync
+from src.sync.epg_status import epg_sync_status
+from src.sync.epg_sync import start_epg_sync
 from src.utils.logger import logger
 
 router = APIRouter(prefix="/api/epg", tags=["epg"])
