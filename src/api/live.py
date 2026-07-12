@@ -1408,7 +1408,19 @@ async def generate_m3u(
         # 时移参数
         catchup_str = ""
         if timeshift_enabled_global and ch["timeshift_enabled"] == 1 and ch["unicast_url"]:
-            catchup_str = f' catchup="default" catchup-source="{ch["unicast_url"]}?playseek=${{(b)yyyyMMddHHmmss}}-${{(e)yyyyMMddHHmmss}}"'
+            # catchup-days 由直播表的 timeshift_length 推算（如 14400 -> 14400/2400 = 6 天），
+            # 比 back_time 更接近运营商实际回看保留时长；enabled 频道至少给 1 天。
+            ts_len = ch["timeshift_length"] or 0
+            catchup_days = max(1, round(ts_len / 2400)) if ts_len > 0 else 0
+            # 同时输出 timeshift（小时单位，N*24）作为备选标签：部分国内衍生播放器只认
+            # timeshift="72" 而不认标准的 catchup-days="3"，两者共存互不冲突，播放器各取所认。
+            catchup_hours = catchup_days * 24
+            catchup_str = (
+                f' catchup="default"'
+                f' catchup-days="{catchup_days}"'
+                f' timeshift="{catchup_hours}"'
+                f' catchup-source="{ch["unicast_url"]}?playseek=${{(b)yyyyMMddHHmmss}}-${{(e)yyyyMMddHHmmss}}"'
+            )
             
         logo_str = f' tvg-logo="{logo_full}"' if logo_full else ""
         

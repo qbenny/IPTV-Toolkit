@@ -74,16 +74,7 @@ async def get_xmltv():
     """)
     channels = c.fetchall()
 
-    # 获取频道的 back_time 配置映射（以 tvg_id 为键，取该 ID 下最大 back_time，默认 0）
-    c.execute("""
-        SELECT tvg_id, MAX(back_time) as max_back_time
-        FROM live_channels
-        WHERE tvg_id != '' AND is_enabled = 1
-        GROUP BY tvg_id
-    """)
-    back_time_map = {row["tvg_id"]: (row["max_back_time"] or 0) for row in c.fetchall()}
-
-    # 获取从过去 7 天开始的所有节目（所有频道的最大数据范围，后面在 Python 中做动态裁剪）
+    # 统一窗口：过去 7 天 + 今天 + 明天（数据已在同步阶段按此范围拉取，输出不再按 back_time 裁剪）
     seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d 00:00:00")
     c.execute("""
         SELECT epg_channel_id, title, start_time, end_time
@@ -93,10 +84,6 @@ async def get_xmltv():
         ORDER BY epg_channel_id, start_time
     """, (seven_days_ago,))
     programs = c.fetchall()
-
-    # 计算今天开始的绝对时刻（今天 00:00:00）
-    now_dt = datetime.now()
-    today_start = datetime(now_dt.year, now_dt.month, now_dt.day)
 
     # 组装 XML
     xml_parts = [
@@ -117,23 +104,12 @@ async def get_xmltv():
         xml_parts.append(f'    <display-name>{_xml_escape(ch_name)}</display-name>')
         xml_parts.append(f'  </channel>')
 
-    # 节目数据
+    # 节目数据（统一窗口，不做按频道 back_time 的动态裁剪）
     for prog in programs:
         ch_id = prog["epg_channel_id"]
         title = prog["title"]
         start_time_str = prog["start_time"]
         end_time_str = prog["end_time"]
-
-        # 根据该频道的 back_time 进行动态天数剪裁
-        back_days = back_time_map.get(ch_id, 0)
-        try:
-            prog_end_dt = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        except Exception:
-            continue
-
-        cutoff_dt = today_start - timedelta(days=back_days)
-        if prog_end_dt < cutoff_dt:
-            continue
 
         start = _format_xmltv_time(start_time_str)
         end = _format_xmltv_time(end_time_str)
