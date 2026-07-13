@@ -677,7 +677,7 @@ const app = createApp({
         async fetchLiveConfig() {
             this.loadingConfig = true;
             try {
-                const r = await fetch('/api/scheduler/config');
+                const r = await fetch('/api/live/config');
                 const config = await r.json();
                 this.liveConfig = {
                     ...config,
@@ -842,14 +842,15 @@ const app = createApp({
                 udpxy_enabled: this.liveConfig.udpxy_enabled_bool ? '1' : '0',
                 fcc_global_enabled: this.liveConfig.fcc_global_enabled_bool ? '1' : '0',
                 timeshift_enabled: this.liveConfig.timeshift_enabled_bool ? '1' : '0',
-                m3u_dual_line: this.liveConfig.m3u_dual_line_bool ? '1' : '0',
-                low_quality_filter: this.liveConfig.low_quality_filter_bool ? '1' : '0',
-                m3u8_filter: this.liveConfig.m3u8_filter_bool ? '1' : '0'
+                m3u_dual_line: this.liveConfig.m3u_dual_line_bool ? '1' : '0'
             };
             delete payload.udpxy_enabled_bool;
             delete payload.fcc_global_enabled_bool;
             delete payload.timeshift_enabled_bool;
             delete payload.m3u_dual_line_bool;
+            // VOD 过滤开关已独立到 /api/vod-config/config，直播配置不再写入
+            delete payload.low_quality_filter;
+            delete payload.m3u8_filter;
             delete payload.low_quality_filter_bool;
             delete payload.m3u8_filter_bool;
 
@@ -874,7 +875,7 @@ const app = createApp({
         // VOD 过滤设置（独立于 liveConfig，仅发送过滤字段，不影响直播配置）
         async fetchVodConfig() {
             try {
-                const r = await fetch('/api/scheduler/config');
+                const r = await fetch('/api/vod-config/config');
                 const config = await r.json();
                 this.vodConfig.low_quality_filter_bool = config.low_quality_filter !== '0';
                 this.vodConfig.m3u8_filter_bool = config.m3u8_filter !== '0';
@@ -889,7 +890,7 @@ const app = createApp({
                 m3u8_filter: this.vodConfig.m3u8_filter_bool ? '1' : '0'
             };
             try {
-                const r = await fetch('/api/live/config', {
+                const r = await fetch('/api/vod-config/config', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)

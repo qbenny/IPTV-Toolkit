@@ -96,7 +96,7 @@ def save_scheduler_config(configs: dict):
 
     供 PUT /api/scheduler/config 调用。配置仍落在 live_config（第 3 步拆表前）。
     """
-    cfg_bulk_set(configs, "live_config")
+    cfg_bulk_set(configs, "scheduler_config")
     if "scheduler_enabled" in configs:
         enabled = str(configs["scheduler_enabled"]).strip().lower() in ("1", "true", "yes", "on", "y")
         apply_scheduler_enabled(enabled)
@@ -106,7 +106,7 @@ def save_scheduler_config(configs: dict):
 
 def _cfg_int(key: str, default: int) -> int:
     try:
-        return int(cfg_get(key, default, "live_config"))
+        return int(cfg_get(key, default, "scheduler_config"))
     except (ValueError, TypeError):
         return default
 
@@ -117,7 +117,7 @@ def _cfg_bool(key: str, default: bool = True) -> bool:
     取值 '1'/'true'/'yes'/'on'/'y'（不区分大小写）视为开启，其余为关闭；
     缺省时返回 default，保证未配置时行为与旧版一致（全部开启）。
     """
-    v = cfg_get(key, None, "live_config")
+    v = cfg_get(key, None, "scheduler_config")
     if v is None:
         return default
     return str(v).strip().lower() in ("1", "true", "yes", "on", "y")

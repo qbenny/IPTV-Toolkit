@@ -156,6 +156,10 @@ app.include_router(epg_router)
 from src.api.scheduler import router as scheduler_router
 app.include_router(scheduler_router)
 
+# 注册 VOD 配置路由
+from src.api.vod_config import router as vod_config_router
+app.include_router(vod_config_router)
+
 # EPG XML 快捷路由
 from src.api.epg import get_xmltv
 app.get("/epg.xml")(get_xmltv)

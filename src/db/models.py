@@ -127,6 +127,17 @@ def init_db():
         )
     """)
 
+    # 第 3 步：拆表准备 —— 各领域独立配置表（与 live_config 同结构 KV）
+    # 旧 live_config 暂保留（第 5 步再废弃），本步仅新增表并把数据分流过去。
+    for tbl in ("vod_config", "scheduler_config", "epg_config"):
+        c.execute(f"""
+            CREATE TABLE IF NOT EXISTS {tbl} (
+                key   TEXT PRIMARY KEY,
+                value TEXT DEFAULT ''
+            )
+        """)
+
+
     # 频道别名映射表
     c.execute("""
         CREATE TABLE IF NOT EXISTS live_channel_aliases (
@@ -229,6 +240,38 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_epg_date ON epg_programs(program_date)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_epg_epg_ch ON epg_programs(epg_channel_id)")
     c.execute("INSERT OR IGNORE INTO live_config(key,value) VALUES('epg_auto_sync','1')")
+
+    # ---- 第 3 步：把 live_config 中各领域 key 分流到新表（幂等，真实值优先）----
+    # 顺序：先迁移 live_config 真实值 -> 新表（INSERT OR IGNORE 不覆盖已有），
+    #       再补各领域默认值（仅缺失时）。旧 live_config 保留，第 5 步再废弃。
+    _config_migrate_keys = {
+        "vod_config": ("low_quality_filter", "m3u8_filter"),
+        "scheduler_config": (
+            "live_sync_hour", "vod_sync_hour", "epg_sync_hour",
+            "scheduler_enabled", "live_sync_enabled",
+            "vod_sync_enabled", "epg_sync_enabled",
+        ),
+        "epg_config": ("epg_auto_sync",),
+    }
+    _config_defaults = {
+        "vod_config": {"low_quality_filter": "1", "m3u8_filter": "1"},
+        "scheduler_config": {
+            "live_sync_hour": "0", "vod_sync_hour": "1", "epg_sync_hour": "1",
+            "scheduler_enabled": "1", "live_sync_enabled": "1",
+            "vod_sync_enabled": "1", "epg_sync_enabled": "1",
+        },
+        "epg_config": {"epg_auto_sync": "1"},
+    }
+    for tbl, keys in _config_migrate_keys.items():
+        for k in keys:
+            c.execute(
+                f"INSERT OR IGNORE INTO {tbl} (key, value) "
+                f"SELECT key, value FROM live_config WHERE key=?",
+                (k,),
+            )
+    for tbl, defaults in _config_defaults.items():
+        for k, v in defaults.items():
+            c.execute(f"INSERT OR IGNORE INTO {tbl} (key, value) VALUES (?, ?)", (k, v))
 
     conn.commit()
     conn.close()

@@ -127,8 +127,8 @@ _M3U8_EXCLUDE_PARAMS = list(_M3U8_POOLS)
 _M3U8_FILTER_CONFIG_KEY = "m3u8_filter"
 
 def _m3u8_filter_enabled() -> bool:
-    """检查 m3u8 池过滤是否启用（默认开启）。"""
-    v = cfg_get(_M3U8_FILTER_CONFIG_KEY, None, "live_config")
+    """检查 m3u8 池过滤是否启用（默认开启）。读 vod_config 表。"""
+    v = cfg_get(_M3U8_FILTER_CONFIG_KEY, None, "vod_config")
     return v is None or v == "1"
 
 
@@ -143,8 +143,8 @@ _LQ_FILTER_CONFIG_KEY = "low_quality_filter"
 
 
 def _low_quality_enabled() -> bool:
-    """检查低质量过滤是否启用（默认开启）。"""
-    v = cfg_get(_LQ_FILTER_CONFIG_KEY, None, "live_config")
+    """检查低质量过滤是否启用（默认开启）。读 vod_config 表。"""
+    v = cfg_get(_LQ_FILTER_CONFIG_KEY, None, "vod_config")
     return v is None or v == "1"  # 不存在或值为"1"都算开启
 
 

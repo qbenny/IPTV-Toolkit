@@ -20,7 +20,7 @@ _SCHEDULER_KEYS = (
 @router.get("/config")
 async def get_scheduler_config():
     """获取定时同步配置（钟点 + 各分开关）。"""
-    all_cfg = cfg_get_all("live_config")
+    all_cfg = cfg_get_all("scheduler_config")
     return {k: all_cfg.get(k) for k in _SCHEDULER_KEYS}
 
 
