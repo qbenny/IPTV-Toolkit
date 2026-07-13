@@ -19,7 +19,8 @@ from datetime import date, datetime
 
 from src.db.models import get_db_connection
 from src.utils.logger import logger
-from src.api.live import run_live_sync, live_sync_status, get_live_configs
+from src.api.live import run_live_sync, live_sync_status
+from src.db.config_store import cfg_get, cfg_bulk_set
 from src.sync.filter_sync import start_sync_background, sync_status
 from src.sync.epg_sync import start_epg_sync
 from src.sync.epg_status import epg_sync_status
@@ -56,12 +57,16 @@ _state = {
 
 
 def start_scheduler(sim, login_func):
-    """启动调度器后台线程（幂等）。"""
+    """启动调度器后台线程（幂等）。总开关关闭时整个定时模块不启动。"""
     global _scheduler_thread, _sim, _login_func, _stop
     if _scheduler_thread and _scheduler_thread.is_alive():
         return
     _sim = sim
     _login_func = login_func
+    # 总开关关闭则整个定时模块不启动（进程重启时若 DB 为关闭状态也不启动线程）
+    if not _cfg_bool("scheduler_enabled", True):
+        logger.info("[Scheduler] 总开关关闭，调度器不启动")
+        return
     _stop = False
     _scheduler_thread = threading.Thread(target=_loop, daemon=True)
     _scheduler_thread.start()
@@ -75,11 +80,33 @@ def stop_scheduler():
     _stop = True
 
 
+def apply_scheduler_enabled(enabled: bool):
+    """根据总开关动态启停调度器线程（整个定时模块开关）。
+
+    开启 -> start_scheduler 启动线程；关闭 -> stop_scheduler 线程退出。
+    """
+    if enabled:
+        start_scheduler(_sim, _login_func)
+    else:
+        stop_scheduler()
+
+
+def save_scheduler_config(configs: dict):
+    """写入定时模块配置，并按总开关动态启停调度器。
+
+    供 PUT /api/scheduler/config 调用。配置仍落在 live_config（第 3 步拆表前）。
+    """
+    cfg_bulk_set(configs, "live_config")
+    if "scheduler_enabled" in configs:
+        enabled = str(configs["scheduler_enabled"]).strip().lower() in ("1", "true", "yes", "on", "y")
+        apply_scheduler_enabled(enabled)
+
+
 # ---- 配置读取 ----
 
 def _cfg_int(key: str, default: int) -> int:
     try:
-        return int(get_live_configs().get(key, default))
+        return int(cfg_get(key, default, "live_config"))
     except (ValueError, TypeError):
         return default
 
@@ -90,13 +117,10 @@ def _cfg_bool(key: str, default: bool = True) -> bool:
     取值 '1'/'true'/'yes'/'on'/'y'（不区分大小写）视为开启，其余为关闭；
     缺省时返回 default，保证未配置时行为与旧版一致（全部开启）。
     """
-    try:
-        v = get_live_configs().get(key)
-        if v is None:
-            return default
-        return str(v).strip().lower() in ("1", "true", "yes", "on", "y")
-    except Exception:
+    v = cfg_get(key, None, "live_config")
+    if v is None:
         return default
+    return str(v).strip().lower() in ("1", "true", "yes", "on", "y")
 
 
 # ---- 当日完成判定 ----

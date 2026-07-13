@@ -8,6 +8,7 @@ import os
 import requests
 from typing import Optional, List
 from src.db.models import get_db_connection
+from src.db.config_store import cfg_get_all, cfg_bulk_set
 from src.utils.logger import logger
 from src.utils.normalize import normalize_epg, normalize_logo
 
@@ -35,12 +36,7 @@ def set_login_func(func):
 
 
 def get_live_configs() -> dict:
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT key, value FROM live_config")
-    rows = c.fetchall()
-    conn.close()
-    return {row["key"]: row["value"] for row in rows}
+    return cfg_get_all("live_config")
 
 
 def get_alias_map() -> dict:
@@ -148,13 +144,8 @@ async def get_live_config():
 
 @router.put("/config")
 async def update_live_config(new_configs: dict):
-    """批量更新直播配置。"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    for k, v in new_configs.items():
-        c.execute("INSERT OR REPLACE INTO live_config (key, value) VALUES (?, ?)", (k, str(v)))
-    conn.commit()
-    conn.close()
+    """批量更新直播配置（含 VOD 过滤开关等仍走本路由写入 live_config）。"""
+    cfg_bulk_set(new_configs, "live_config")
     return {"status": "success"}
 
 

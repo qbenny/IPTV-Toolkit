@@ -6,6 +6,7 @@ import sqlite3
 from typing import Optional
 
 from src.db.models import get_db_connection
+from src.db.config_store import cfg_get
 from src.utils.logger import logger
 
 # 地区归一化映射表
@@ -127,15 +128,8 @@ _M3U8_FILTER_CONFIG_KEY = "m3u8_filter"
 
 def _m3u8_filter_enabled() -> bool:
     """检查 m3u8 池过滤是否启用（默认开启）。"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT value FROM live_config WHERE key=?", (_M3U8_FILTER_CONFIG_KEY,))
-        row = c.fetchone()
-        conn.close()
-        return row is None or row[0] == "1"
-    except Exception:
-        return True
+    v = cfg_get(_M3U8_FILTER_CONFIG_KEY, None, "live_config")
+    return v is None or v == "1"
 
 
 def _m3u8_exclude_sql() -> tuple:
@@ -150,15 +144,8 @@ _LQ_FILTER_CONFIG_KEY = "low_quality_filter"
 
 def _low_quality_enabled() -> bool:
     """检查低质量过滤是否启用（默认开启）。"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT value FROM live_config WHERE key=?", (_LQ_FILTER_CONFIG_KEY,))
-        row = c.fetchone()
-        conn.close()
-        return row is None or row[0] == "1"  # 不存在或值为"1"都算开启
-    except Exception:
-        return True  # 容错
+    v = cfg_get(_LQ_FILTER_CONFIG_KEY, None, "live_config")
+    return v is None or v == "1"  # 不存在或值为"1"都算开启
 
 
 def _low_quality_sql(db_type: str = None) -> tuple:

@@ -40,6 +40,7 @@ const app = createApp({
             savingStb: false,
             simStatus: { is_authenticated: false, epg_base_url: null, user_token: null, jsessionid: null },
             simStatusTimer: null,
+            schedulerStatusTimer: null,
 
             // Plate 1: 定时同步设置
             schedulerConfig: { live_sync_hour: 0, vod_sync_hour: 1, epg_sync_hour: 1, scheduler_enabled_bool: true, live_sync_enabled_bool: true, vod_sync_enabled_bool: true, epg_sync_enabled_bool: true },
@@ -391,10 +392,10 @@ const app = createApp({
 
         // ---- Polling ----
         stopAllPolling() {
-            [this.simStatusTimer, this.syncStatusTimer, this.logPollTimer].forEach(t => {
+            [this.simStatusTimer, this.syncStatusTimer, this.logPollTimer, this.schedulerStatusTimer].forEach(t => {
                 if (t) { clearInterval(t); }
             });
-            this.simStatusTimer = this.syncStatusTimer = this.logPollTimer = null;
+            this.simStatusTimer = this.syncStatusTimer = this.logPollTimer = this.schedulerStatusTimer = null;
         },
 
         // ---- STB Config ----
@@ -419,6 +420,9 @@ const app = createApp({
         startSimStatusPolling() {
             this.fetchSimStatus();
             if (!this.simStatusTimer) this.simStatusTimer = setInterval(() => this.fetchSimStatus(), 5000);
+            // 调度器状态每 10s 刷新，使总开关/运行状态即时反映真实情况
+            this.fetchSchedulerStatus();
+            if (!this.schedulerStatusTimer) this.schedulerStatusTimer = setInterval(() => this.fetchSchedulerStatus(), 10000);
         },
 
         maskToken(token) {
@@ -469,7 +473,7 @@ const app = createApp({
         // ---- 定时同步设置（钟点存于 live_config，状态来自调度器）----
         async fetchSchedulerConfig() {
             try {
-                const r = await fetch('/api/live/config');
+                const r = await fetch('/api/scheduler/config');
                 const c = await r.json();
                 this.schedulerConfig = {
                     live_sync_hour: parseInt(c.live_sync_hour ?? 0) || 0,
@@ -493,7 +497,7 @@ const app = createApp({
         async saveSchedulerConfig() {
             this.savingScheduler = true;
             try {
-                const r = await fetch('/api/live/config', {
+                const r = await fetch('/api/scheduler/config', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -673,7 +677,7 @@ const app = createApp({
         async fetchLiveConfig() {
             this.loadingConfig = true;
             try {
-                const r = await fetch('/api/live/config');
+                const r = await fetch('/api/scheduler/config');
                 const config = await r.json();
                 this.liveConfig = {
                     ...config,
@@ -870,7 +874,7 @@ const app = createApp({
         // VOD 过滤设置（独立于 liveConfig，仅发送过滤字段，不影响直播配置）
         async fetchVodConfig() {
             try {
-                const r = await fetch('/api/live/config');
+                const r = await fetch('/api/scheduler/config');
                 const config = await r.json();
                 this.vodConfig.low_quality_filter_bool = config.low_quality_filter !== '0';
                 this.vodConfig.m3u8_filter_bool = config.m3u8_filter !== '0';

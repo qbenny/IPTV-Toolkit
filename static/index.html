@@ -258,13 +258,15 @@
                                 {{ savingScheduler ? '正在保存...' : '💾 保存定时设置' }}
                             </button>
                         </div>
+
                         <div class="status-list" style="margin-top: 18px;">
                             <div class="status-item">
-                                <span class="status-label">调度器</span>
+                                <span class="status-label">实际运行状态</span>
                                 <span :class="schedulerStatus.running ? 'status-val text-success' : 'status-val text-muted'">
-                                    {{ schedulerStatus.running ? '✅ 运行中' : '⭕ 未运行' }}
+                                    {{ schedulerStatus.running ? '🟢 运行中' : '⭕ 已暂停' }}
                                 </span>
                             </div>
+
                             <div class="status-item" v-for="(t, name) in schedulerStatus.tasks" :key="name">
                                 <span class="status-label">{{ taskLabels[name] || name }}</span>
                                 <span class="status-val">
