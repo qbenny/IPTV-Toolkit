@@ -42,7 +42,7 @@ const app = createApp({
             simStatusTimer: null,
 
             // Plate 1: 定时同步设置
-            schedulerConfig: { live_sync_hour: 0, vod_sync_hour: 1, epg_sync_hour: 1 },
+            schedulerConfig: { live_sync_hour: 0, vod_sync_hour: 1, epg_sync_hour: 1, scheduler_enabled_bool: true, live_sync_enabled_bool: true, vod_sync_enabled_bool: true, epg_sync_enabled_bool: true },
             schedulerStatus: { running: false, config: {}, tasks: {} },
             savingScheduler: false,
             taskLabels: { live: '直播频道', vod: 'VOD 点播', epg: 'EPG 节目单' },
@@ -474,7 +474,11 @@ const app = createApp({
                 this.schedulerConfig = {
                     live_sync_hour: parseInt(c.live_sync_hour ?? 0) || 0,
                     vod_sync_hour: parseInt(c.vod_sync_hour ?? 1) || 0,
-                    epg_sync_hour: parseInt(c.epg_sync_hour ?? 1) || 0
+                    epg_sync_hour: parseInt(c.epg_sync_hour ?? 1) || 0,
+                    scheduler_enabled_bool: c.scheduler_enabled !== '0',   // 默认开启
+                    live_sync_enabled_bool: c.live_sync_enabled !== '0',  // 默认开启
+                    vod_sync_enabled_bool: c.vod_sync_enabled !== '0',    // 默认开启
+                    epg_sync_enabled_bool: c.epg_sync_enabled !== '0'     // 默认开启
                 };
             } catch (e) { /* silent */ }
         },
@@ -492,11 +496,15 @@ const app = createApp({
                 const r = await fetch('/api/live/config', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        live_sync_hour: String(this.schedulerConfig.live_sync_hour),
-                        vod_sync_hour: String(this.schedulerConfig.vod_sync_hour),
-                        epg_sync_hour: String(this.schedulerConfig.epg_sync_hour)
-                    })
+                body: JSON.stringify({
+                    live_sync_hour: String(this.schedulerConfig.live_sync_hour),
+                    vod_sync_hour: String(this.schedulerConfig.vod_sync_hour),
+                    epg_sync_hour: String(this.schedulerConfig.epg_sync_hour),
+                    scheduler_enabled: this.schedulerConfig.scheduler_enabled_bool ? '1' : '0',
+                    live_sync_enabled: this.schedulerConfig.live_sync_enabled_bool ? '1' : '0',
+                    vod_sync_enabled: this.schedulerConfig.vod_sync_enabled_bool ? '1' : '0',
+                    epg_sync_enabled: this.schedulerConfig.epg_sync_enabled_bool ? '1' : '0'
+                })
                 });
                 if (r.ok) {
                     this.showToast('定时设置已保存，即时生效');

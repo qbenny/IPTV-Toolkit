@@ -1,8 +1,9 @@
 """
 定时同步调度器（A+E+B+D）。
 
-- 直播同步：每天 live_sync_hour（默认 0）触发；若进程已登录且今天尚未同步，
-  则首次登录即顺带完成（零额外顶号）；全天无登录则到 live_sync_hour 强制登录兜底。
+- 直播同步：每天 live_sync_hour（默认 0）触发；已到钟点且进程已登录则顺带完成
+  （零额外顶号），未登录则到 live_sync_hour 强制登录兜底。严格按配置钟点执行，
+  不会在 00:00（新的一天）因 token 仍有效而提前触发。
 - VOD / EPG 同步：免登录（login_func=None，只打公共接口），分别在 vod_sync_hour /
   epg_sync_hour（默认均为 1）触发；二者经互斥门顺序执行（VOD 先于 EPG），
   同一时刻只有一个线程池在跑，避免并发压服务器。
@@ -83,6 +84,21 @@ def _cfg_int(key: str, default: int) -> int:
         return default
 
 
+def _cfg_bool(key: str, default: bool = True) -> bool:
+    """读取 live_config 中的布尔开关，默认开启（True）。
+
+    取值 '1'/'true'/'yes'/'on'/'y'（不区分大小写）视为开启，其余为关闭；
+    缺省时返回 default，保证未配置时行为与旧版一致（全部开启）。
+    """
+    try:
+        v = get_live_configs().get(key)
+        if v is None:
+            return default
+        return str(v).strip().lower() in ("1", "true", "yes", "on", "y")
+    except Exception:
+        return default
+
+
 # ---- 当日完成判定 ----
 
 def _live_synced_today() -> bool:
@@ -144,14 +160,21 @@ def _tick():
         _reset_day()
         _last_day = today
 
+    # 总开关：定时同步整体关闭时直接跳过（无需重启进程，开关即时生效）
+    if not _cfg_bool("scheduler_enabled", True):
+        return
+
     now = datetime.now()
     live_hour = _cfg_int("live_sync_hour", 0)
     vod_hour = _cfg_int("vod_sync_hour", 1)
     epg_hour = _cfg_int("epg_sync_hour", 1)
 
-    _check_live(now, live_hour)
-    _check_vod(now, today, vod_hour)
-    _check_epg(now, today, epg_hour)
+    if _cfg_bool("live_sync_enabled", True):
+        _check_live(now, live_hour)
+    if _cfg_bool("vod_sync_enabled", True):
+        _check_vod(now, today, vod_hour)
+    if _cfg_bool("epg_sync_enabled", True):
+        _check_epg(now, today, epg_hour)
 
 
 def _reset_day():
@@ -194,13 +217,19 @@ def _check_live(now, hour):
         return
     if _sync_busy():
         return  # 等 VOD/EPG 同步结束后再顺序执行
-    if _sim.state.is_authenticated:
-        # 首次登录顺带触发：今天未跑就立即跑（不限钟点）
-        _trigger_live(force_login=False)
-        return
-    # 未登录：等到 live_sync_hour 才强制登录兜底
+
+    # 未到设定钟点：即便已登录也不提前触发，严格等到 live_sync_hour 再跑。
+    # 否则连续运行的进程在 00:00（新的一天）因 token 仍有效会立刻同步，
+    # 无视用户配置的钟点（如 8 点）。
     if now.hour < hour:
         return
+
+    # 已到钟点（也覆盖进程晚于钟点才启动的情形）
+    if _sim.state.is_authenticated:
+        # 已登录：顺带触发，无需额外顶号
+        _trigger_live(force_login=False)
+        return
+    # 未登录：强制登录兜底（受重试上限约束）
     if st["retrying"] and now.hour < (st["next_retry_hour"] or 0):
         return
     _trigger_live(force_login=True)
@@ -309,9 +338,13 @@ def get_scheduler_state() -> dict:
     return {
         "running": bool(_scheduler_thread and _scheduler_thread.is_alive()),
         "config": {
+            "scheduler_enabled": _cfg_bool("scheduler_enabled", True),
             "live_sync_hour": _cfg_int("live_sync_hour", 0),
+            "live_sync_enabled": _cfg_bool("live_sync_enabled", True),
             "vod_sync_hour": _cfg_int("vod_sync_hour", 1),
+            "vod_sync_enabled": _cfg_bool("vod_sync_enabled", True),
             "epg_sync_hour": _cfg_int("epg_sync_hour", 1),
+            "epg_sync_enabled": _cfg_bool("epg_sync_enabled", True),
         },
         "tasks": {
             name: {
