@@ -31,7 +31,7 @@ def _set_sync_status(**kwargs):
         sync_status[k] = v
 
 
-def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2) -> int:
+def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2):
     """单次请求拉取 filter.json 全量数据并写入数据库。
 
     Args:
@@ -41,12 +41,15 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
         orderby: 排序方式（2=评分降序）
 
     Returns:
-        成功同步的条目数
+        (count, ok) 元组：
+            count: 成功同步的条目数
+            ok:    本次拉取是否成功（HTTP 200 且正常解析，含返回空数据）；
+                  地址未解析 / HTTP 错误 / 异常 视为失败（ok=False）
     """
     vis_domain = simulator.state.vis_base_url
     if not vis_domain:
         logger.error("[Sync] VIS 服务器地址未解析，跳过同步 %s", type_name)
-        return 0
+        return 0, False
 
     logger.info("[Sync] 开始同步 %s (sync_time=%d)", type_name, sync_time)
 
@@ -64,15 +67,15 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
         res = fetch_with_retry(url, params, headers=simulator.config.headers, tag="Sync")
         if res.status_code != 200:
             logger.warning("[Sync] 同步 %s 失败: HTTP %d", type_name, res.status_code)
-            return 0
+            return 0, False
         dt_net = time.perf_counter() - t_net
 
         t_parse = time.perf_counter()
         data = res.json()
         items = data.get("resultSet", [])
         if not items:
-            logger.warning("[Sync] %s 返回空数据 (网络=%.2fs)", type_name, dt_net)
-            return 0
+            logger.warning("[Sync] %s 返回空数据 (网络=%.2fs)，按成功处理（将清理该分类旧数据）", type_name, dt_net)
+            return 0, True
         dt_parse = time.perf_counter() - t_parse
 
         t_write = time.perf_counter()
@@ -84,10 +87,10 @@ def sync_filter_data(simulator, type_name: str, sync_time: int, orderby: int = 2
     except Exception as e:
         logger.error("[Sync] 同步 %s 异常: %s", type_name, e)
         _set_sync_status(last_error=str(e))
-        return 0
+        return 0, False
 
     logger.info(">>> [Sync] %s 同步完成，共 %d 条", type_name, count)
-    return count
+    return count, True
 
 
 def full_sync(simulator, login_func=None) -> dict:
@@ -129,6 +132,7 @@ def full_sync(simulator, login_func=None) -> dict:
             return {}
 
     results = {}
+    success_flags = {}   # type_name -> ok（是否成功拉取，含返回空）
     done_total = 0
     # 并发拉取 10 个类型：墙钟由最慢单类（电视剧）决定，5 路已足够且减轻服务器压力
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -139,11 +143,12 @@ def full_sync(simulator, login_func=None) -> dict:
         for future in concurrent.futures.as_completed(future_to_type):
             t = future_to_type[future]
             try:
-                count = future.result()
+                count, ok = future.result()
             except Exception as e:
                 logger.error("[Sync] %s 同步异常: %s", t, e)
-                count = 0
+                count, ok = 0, False
             results[t] = count
+            success_flags[t] = ok
             done_total += count
             _set_sync_status(
                 current_type=t,
@@ -151,19 +156,41 @@ def full_sync(simulator, login_func=None) -> dict:
                 progress=f"{t} 完成 ({count} 条)",
             )
 
-    # 所有类型同步完成后，清理过期数据
-    _set_sync_status(progress="清理旧数据...", current_type="清理中")
-    clean_old_data(sync_time)
+    # 仅清理「成功拉取到的分类」的旧数据；失败/未返回的分类保留其现有数据，
+    # 避免一次部分失败就把整库或全部分类的旧数据清掉。
+    successful_types = [t for t in types if success_flags.get(t)]
+    failed_types = [t for t in types if not success_flags.get(t)]
 
-    _set_sync_status(
-        running=False,
-        progress="同步完成",
-        last_sync_time=sync_time,
-        current_type="",
-        done=0,
-        total=0,
-        results=results,
-    )
+    if successful_types:
+        _set_sync_status(progress="清理旧数据...", current_type="清理中")
+        for t in successful_types:
+            clean_old_data(sync_time, t)
+
+    if not failed_types:
+        # 全部成功（含个别分类返回空）：标记今日完成
+        _set_sync_status(
+            running=False,
+            progress="同步完成",
+            last_sync_time=sync_time,
+            current_type="",
+            done=0,
+            total=0,
+            results=results,
+        )
+    else:
+        # 部分/全部失败：不更新 last_sync_time，让调度器按重试逻辑继续；
+        # 失败分类的现有数据已通过「仅清理成功分类」得以保留。
+        msg = "以下分类同步失败，已保留其现有数据待重试：" + "、".join(failed_types)
+        logger.warning("[Sync] %s", msg)
+        _set_sync_status(
+            running=False,
+            progress="同步部分失败（失败分类已保留数据）" if successful_types else "同步失败（未写入任何数据，已跳过清理）",
+            last_error=msg,
+            current_type="",
+            done=0,
+            total=0,
+            results=results,
+        )
 
     logger.info(">>> [Sync] 全量同步完成: %s", results)
     return results

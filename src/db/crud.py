@@ -445,20 +445,26 @@ def get_unique_values(column: str, type_name: str = None) -> list:
     return values
 
 
-def clean_old_data(sync_time: int):
+def clean_old_data(sync_time: int, type_name: str = None):
     """删除同步时间戳不是指定值的旧数据（全量覆盖用）。
 
     Args:
         sync_time: 当前批次同步时间戳，不等于此值的数据将被删除
+        type_name: 仅清理指定分类（None 表示全部分类）。用于部分分类同步失败时，
+                   只清理成功拉取到的分类，避免把失败分类的现有数据一并清掉。
     """
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM vod_items WHERE syncedAt != ?", (sync_time,))
+    if type_name:
+        c.execute("DELETE FROM vod_items WHERE type = ? AND syncedAt != ?", (type_name, sync_time))
+    else:
+        c.execute("DELETE FROM vod_items WHERE syncedAt != ?", (sync_time,))
     deleted = c.rowcount
     conn.commit()
     conn.close()
     if deleted > 0:
-        logger.info(f"[DB] 清理 {deleted} 条过期数据")
+        scope = type_name or "全部"
+        logger.info(f"[DB] 清理 {deleted} 条过期数据（{scope}）")
 
 
 if __name__ == "__main__":
