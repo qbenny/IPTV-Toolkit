@@ -64,7 +64,7 @@ const app = createApp({
             liveTotal: 0,
             liveCategories: [],
             liveConfig: {
-                udpxy_address: '', epg_url: '', logo_base_url: '',
+                udpxy_address: '', logo_base_url: '',
                 fcc_global_enabled_bool: false, timeshift_enabled_bool: false,
                 m3u_dual_line_bool: false,
                 low_quality_filter_bool: true, m3u8_filter_bool: true
@@ -99,6 +99,10 @@ const app = createApp({
             tbodyKey: 0,
 
             // Plate 5: EPG
+            epgConfig: {
+                epg_auto_sync_bool: true,
+                epg_url: ''
+            },
             epgSyncStatus: { running: false, progress: '', last_sync_time: null },
             epgSyncTimer: null,
             epgStats: { total_programs: 0, total_channels: 0, date_range: null },
@@ -172,6 +176,7 @@ const app = createApp({
                 this.initLiveTab();
             } else if (newTab === 'epg') {
                 this.fetchEpgStats();
+                this.fetchEpgConfig();
                 this.startEpgSyncPolling();
             }
         },
@@ -200,6 +205,7 @@ const app = createApp({
         this.fetchDbStats();
         this.fetchSimStatus(); // Initial fetch of auth status globally
         this.fetchVodConfig();  // 加载 VOD 过滤设置（独立于 liveConfig）
+        this.fetchEpgConfig();  // 加载 EPG 配置（epg_config）
         this.fetchSchedulerConfig();  // 加载定时同步钟点配置
         this.fetchSchedulerStatus();  // 加载调度器运行状态
         if (this.activeTab === 'stb') {
@@ -897,6 +903,41 @@ const app = createApp({
                 });
                 if (r.ok) {
                     this.showToast('过滤设置已保存');
+                } else {
+                    this.showToast('保存失败', 'error');
+                }
+            } catch (e) {
+                this.showToast('网络错误', 'error');
+            }
+        },
+
+        // EPG 配置（独立 epg_config，避免与直播配置耦合）
+        async fetchEpgConfig() {
+            try {
+                const r = await fetch('/api/epg/config');
+                const config = await r.json();
+                this.epgConfig = {
+                    epg_auto_sync_bool: config.epg_auto_sync !== '0',  // 默认开启
+                    epg_url: config.epg_url || ''
+                };
+            } catch (e) {
+                console.warn('获取 EPG 配置失败，使用默认值', e);
+            }
+        },
+
+        async saveEpgConfig() {
+            const payload = {
+                epg_auto_sync: this.epgConfig.epg_auto_sync_bool ? '1' : '0',
+                epg_url: this.epgConfig.epg_url || ''
+            };
+            try {
+                const r = await fetch('/api/epg/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (r.ok) {
+                    this.showToast('EPG 配置已保存');
                 } else {
                     this.showToast('保存失败', 'error');
                 }

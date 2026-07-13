@@ -8,7 +8,7 @@ import os
 import requests
 from typing import Optional, List
 from src.db.models import get_db_connection
-from src.db.config_store import cfg_get_all, cfg_bulk_set
+from src.db.config_store import cfg_get, cfg_get_all, cfg_bulk_set
 from src.utils.logger import logger
 from src.utils.normalize import normalize_epg, normalize_logo
 
@@ -1338,7 +1338,7 @@ async def generate_m3u(
     timeshift_enabled_global = configs.get("timeshift_enabled", "1") == "1"
     logo_base_url = configs.get("logo_base_url", "/static/logo/").strip()
     m3u_dual_line = configs.get("m3u_dual_line", "0") == "1"
-    epg_url = configs.get("epg_url", "").strip()
+    epg_url = cfg_get("epg_url", "", "epg_config").strip()
     
     conn = get_db_connection()
     c = conn.cursor()

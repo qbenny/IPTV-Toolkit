@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, Response
 from fastapi.responses import JSONResponse
 
 from src.db.models import get_db_connection
+from src.db.config_store import cfg_get_all, cfg_bulk_set
 from src.sync.epg_status import epg_sync_status
 from src.sync.epg_sync import start_epg_sync
 from src.utils.logger import logger
@@ -25,6 +26,22 @@ def set_simulator(sim):
 def set_login_func(func):
     global _login_func
     _login_func = func
+
+
+# ── 配置管理 ──────────────────────────────────────────
+
+@router.get("/config")
+async def get_epg_config():
+    """读取 EPG 配置（epg_config 表：epg_auto_sync / epg_url 等）。"""
+    return cfg_get_all("epg_config")
+
+
+@router.put("/config")
+async def update_epg_config(new_configs: dict):
+    """写入 EPG 配置。"""
+    cfg_bulk_set(new_configs, "epg_config")
+    return {"status": "success", "message": "EPG 配置已保存"}
+
 
 
 def _ensure_auth() -> bool:
