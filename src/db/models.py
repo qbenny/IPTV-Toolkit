@@ -128,7 +128,7 @@ def init_db():
     """)
 
     # 第 3 步：拆表准备 —— 各领域独立配置表（与 live_config 同结构 KV）
-    # 旧 live_config 暂保留（第 5 步再废弃），本步仅新增表并把数据分流过去。
+    # live_config 已清理为纯直播配置（其余 key 已分流到 vod_config/scheduler_config/epg_config），本步仅新增表并把数据分流过去。
     for tbl in ("vod_config", "scheduler_config", "epg_config"):
         c.execute(f"""
             CREATE TABLE IF NOT EXISTS {tbl} (
@@ -208,7 +208,6 @@ def init_db():
     default_configs = {
         "udpxy_enabled": "1",
         "udpxy_address": "",
-        "m3u_auth_required": "0",
         "fcc_global_enabled": "0",
         "timeshift_enabled": "1",
         "logo_base_url": "/static/logo/",
@@ -276,7 +275,7 @@ def init_db():
     #      live_config 的它们（crud 读 vod_config、scheduler_engine 读 scheduler_config、
     #      api/scheduler 读 scheduler_config、M3U 生成读 epg_config.epg_url）。
     #  (b) 旧同步子系统遗留的 sync_channels_*/sync_vod_*/sync_epg_* 开关——全仓库已无任何
-    #      代码读取（原 vis_provider.py 早已不存在），属死键，一并清除。
+    #      代码读取，属死键，一并清除。
     # 清理后 live_config 仅保留纯直播配置（udpxy/fcc/timeshift/logo/m3u 等）。
     _orphan_keys = []
     for _keys in _config_migrate_keys.values():
@@ -287,6 +286,7 @@ def init_db():
         "sync_epg_enabled", "sync_epg_schedule_type", "sync_epg_schedule_value",
     )
     _orphan_keys.extend(_legacy_sync_keys)
+    _orphan_keys.append("m3u_auth_required")  # 历史遗留开关，从未被读取，一并清除
     if _orphan_keys:
         _qmarks = ",".join("?" * len(_orphan_keys))
         c.execute(f"DELETE FROM live_config WHERE key IN ({_qmarks})", _orphan_keys)

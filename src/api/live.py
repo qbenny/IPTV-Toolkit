@@ -144,7 +144,7 @@ async def get_live_config():
 
 @router.put("/config")
 async def update_live_config(new_configs: dict):
-    """批量更新直播配置（含 VOD 过滤开关等仍走本路由写入 live_config）。"""
+    """批量更新直播配置（纯直播配置；VOD 过滤开关已分流到 vod_config）。"""
     cfg_bulk_set(new_configs, "live_config")
     return {"status": "success"}
 

@@ -3,8 +3,8 @@ EPG Provider 插件基类与共享工具。
 
 - Program / FetchResult：统一的数据结构，所有 Provider 产出此格式。
 - EPGProvider：数据源抽象基类。
-- parse_time_based_programs / is_channel_covered：凤凰 / 电视猫等基于
-  {HH:MM, title} 列表的 Provider 共用的转换与覆盖检查工具。
+- parse_time_based_programs：凤凰 / 电视猫等基于 {HH:MM, title} 列表的
+  Provider 共用的转换工具。
 - _upsert_programs / _clean_expired：统一写入 / 清理逻辑，供调度器与各
   Provider 复用（放在 base 层可避免 epg_sync ↔ provider 循环 import）。
 """
@@ -111,28 +111,6 @@ def parse_time_based_programs(date_str: str, time_title_pairs: List[dict],
             raw_data={"provider": provider_name, "source": provider_name},
         ))
     return programs
-
-
-def is_channel_covered(conn, channel_id: str, check_days: int = 3,
-                       threshold_per_day: int = 8) -> bool:
-    """判断某频道近期是否已有足够节目数据（补充 Provider 据此跳过已覆盖频道）。
-
-    Args:
-        conn: DB 连接
-        channel_id: live_channels.channel_id
-        check_days: 检查最近 N 天
-        threshold_per_day: 单日节目数达到此值视为已覆盖
-    """
-    cutoff = (datetime.now() - timedelta(days=check_days)).strftime("%Y-%m-%d 00:00:00")
-    c = conn.cursor()
-    c.execute(
-        "SELECT COUNT(*) AS cnt FROM epg_programs "
-        "WHERE channel_id = ? AND start_time >= ?",
-        (str(channel_id), cutoff),
-    )
-    row = c.fetchone()
-    cnt = row["cnt"] if row else 0
-    return cnt >= threshold_per_day * check_days
 
 
 # ---- 统一写入 / 清理 ----

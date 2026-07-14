@@ -23,6 +23,7 @@ class STBRuntimeState:
         self.last_heartbeat_time: float = 0.0
         self.heartbeat_fail_count: int = 0
         self.last_active_time: float = time.time()          # 最近客户端请求活跃时间
+        self.last_login_time: float = time.time()           # 最近一次成功登录的时间戳
 
         # VIS 相关
         self.vis_base_url: Optional[str] = None             # VIS VOD 服务器地址

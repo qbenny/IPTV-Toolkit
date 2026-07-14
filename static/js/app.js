@@ -66,8 +66,7 @@ const app = createApp({
             liveConfig: {
                 udpxy_address: '', logo_base_url: '',
                 fcc_global_enabled_bool: false, timeshift_enabled_bool: false,
-                m3u_dual_line_bool: false,
-                low_quality_filter_bool: true, m3u8_filter_bool: true
+                m3u_dual_line_bool: false
             },
             // VOD 过滤设置（独立于 liveConfig，避免保存时覆盖直播配置）
             vodConfig: {
@@ -690,9 +689,7 @@ const app = createApp({
                     udpxy_enabled_bool: config.udpxy_enabled === '1',
                     fcc_global_enabled_bool: config.fcc_global_enabled === '1',
                     timeshift_enabled_bool: config.timeshift_enabled === '1',
-                    m3u_dual_line_bool: config.m3u_dual_line === '1',
-                    low_quality_filter_bool: config.low_quality_filter !== '0',  // 默认开启
-                    m3u8_filter_bool: config.m3u8_filter !== '0'  // 默认开启
+                    m3u_dual_line_bool: config.m3u_dual_line === '1'
                 };
             } catch (e) { /* silent */ }
             this.$nextTick(() => {
@@ -854,11 +851,7 @@ const app = createApp({
             delete payload.fcc_global_enabled_bool;
             delete payload.timeshift_enabled_bool;
             delete payload.m3u_dual_line_bool;
-            // VOD 过滤开关已独立到 /api/vod-config/config，直播配置不再写入
-            delete payload.low_quality_filter;
-            delete payload.m3u8_filter;
-            delete payload.low_quality_filter_bool;
-            delete payload.m3u8_filter_bool;
+
 
             try {
                 const r = await fetch('/api/live/config', {

@@ -8,7 +8,6 @@ from src.sync.epg_providers.base import (
     FetchResult,
     EPGProvider,
     parse_time_based_programs,
-    is_channel_covered,
 )
 
 __all__ = [
@@ -16,5 +15,4 @@ __all__ = [
     "FetchResult",
     "EPGProvider",
     "parse_time_based_programs",
-    "is_channel_covered",
 ]

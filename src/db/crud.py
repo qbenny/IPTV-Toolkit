@@ -403,35 +403,6 @@ def get_stats() -> dict:
     }
 
 
-def get_unique_values(column: str, type_name: str = None) -> list:
-    """获取某个字段的去重值列表（用于生成过滤器选项）。
-
-    Args:
-        column: 列名（如 country, year）
-        type_name: 可选，限制类型
-
-    Returns:
-        去重后的值列表（降序排列）
-    """
-    conn = get_db_connection()
-    c = conn.cursor()
-    if type_name:
-        c.execute(f"""
-            SELECT DISTINCT {column} FROM vod_items
-            WHERE type = ? AND {column} != ''
-            ORDER BY {column} DESC
-        """, (type_name,))
-    else:
-        c.execute(f"""
-            SELECT DISTINCT {column} FROM vod_items
-            WHERE {column} != ''
-            ORDER BY {column} DESC
-        """)
-    values = [row[0] for row in c.fetchall()]
-    conn.close()
-    return values
-
-
 def clean_old_data(sync_time: int, type_name: str = None):
     """删除同步时间戳不是指定值的旧数据（全量覆盖用）。
 
@@ -493,10 +464,6 @@ if __name__ == "__main__":
     # 测试过滤
     result = filter_items("movies")
     print(f">>> 过滤 movies: {result['total']} 条")
-
-    # 测试 get_unique_values
-    countries = get_unique_values("country")
-    print(f">>> 国家列表: {countries}")
 
     # 清理测试数据
     clean_old_data(0)

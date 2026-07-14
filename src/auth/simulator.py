@@ -185,6 +185,7 @@ class STBSimulator:
 
             self.state.user_token = final_token_match.group(1)
             self.state.is_authenticated = True
+            self.state.last_login_time = time.time()        # 记录本次成功登录时间
             self.state.update_heartbeat_timer()
             self.logger.info("========== 模拟机顶盒上线成功 ==========")
             self.logger.info("正式通行 Token (UserToken): %s", self.state.user_token)
