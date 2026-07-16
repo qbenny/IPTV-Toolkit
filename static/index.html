@@ -20,7 +20,7 @@
             
             <nav class="nav-menu">
                 <a href="#" :class="['nav-item', { active: activeTab === 'stb' }]" @click.prevent="activeTab = 'stb'">
-                    <span class="nav-icon">⚙️</span> 系统凭证配置
+                    <span class="nav-icon">⚙️</span> 系统配置
                 </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'sync' }]" @click.prevent="activeTab = 'sync'">
                     <span class="nav-icon">🔄</span> 数据同步管理
@@ -89,7 +89,7 @@
                 </div>
             </transition>
 
-            <!-- 板块一：系统凭证配置 -->
+            <!-- 板块一：系统配置 -->
             <section v-if="activeTab === 'stb'" class="tab-pane">
                 <div class="card-grid">
                     <div class="card form-card">
@@ -180,6 +180,109 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 定时同步设置 -->
+                    <div class="card form-card">
+                        <div class="card-header">
+                            <h3>定时同步设置</h3>
+                            <span class="badge">scheduler</span>
+                        </div>
+                        <div class="form-group inline-checkbox-group" style="margin-bottom: 14px;">
+                            <label class="switch-item">
+                                <label class="switch-toggle">
+                                    <input type="checkbox" v-model="schedulerConfig.scheduler_enabled_bool">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label-text">⏰ 启用定时同步（总开关）</span>
+                            </label>
+                        </div>
+                        <div class="scheduler-conditional" :style="{ opacity: schedulerConfig.scheduler_enabled_bool ? 1 : 0.45, pointerEvents: schedulerConfig.scheduler_enabled_bool ? 'auto' : 'none' }">
+                            <div class="form-grid scheduler-form-grid">
+                                <div class="form-group">
+                                    <label>直播同步时刻</label>
+                                    <select class="scheduler-select" v-model.number="schedulerConfig.live_sync_hour" :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig.live_sync_enabled_bool">
+                                        <option v-for="h in 24" :key="'live'+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>VOD 同步时刻</label>
+                                    <select class="scheduler-select" v-model.number="schedulerConfig.vod_sync_hour" :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig.vod_sync_enabled_bool">
+                                        <option v-for="h in 24" :key="'vod'+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>EPG 同步时刻</label>
+                                    <select class="scheduler-select" v-model.number="schedulerConfig.epg_sync_hour" :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig.epg_sync_enabled_bool">
+                                        <option v-for="h in 24" :key="'epg'+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-grid scheduler-form-grid" style="margin-top: 12px;">
+                                <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
+                                    <label class="switch-item">
+                                        <label class="switch-toggle">
+                                            <input type="checkbox" v-model="schedulerConfig.live_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
+                                            <span class="switch-slider"></span>
+                                        </label>
+                                        <span class="switch-label-text">📺 启用直播定时同步</span>
+                                    </label>
+                                </div>
+                                <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
+                                    <label class="switch-item">
+                                        <label class="switch-toggle">
+                                            <input type="checkbox" v-model="schedulerConfig.vod_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
+                                            <span class="switch-slider"></span>
+                                        </label>
+                                        <span class="switch-label-text">🎬 启用 VOD 定时同步</span>
+                                    </label>
+                                </div>
+                                <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
+                                    <label class="switch-item">
+                                        <label class="switch-toggle">
+                                            <input type="checkbox" v-model="schedulerConfig.epg_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
+                                            <span class="switch-slider"></span>
+                                        </label>
+                                        <span class="switch-label-text">📅 启用 EPG 定时同步</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="status-desc" style="margin: 10px 0 0;">
+                            直播：进程已登录且当天未同步会立即顺带执行（不额外顶号）；若全天无登录，则到设定时刻强制登录兜底。注意：设为 0（午夜）时，因进程靠心跳常驻已登录，同步会在 00:00 触发；若希望“当天首次真实使用时”才同步，请把该值设为非 0 的小时（如 8）。
+                            VOD / EPG：免登录，仅打公共接口；当天尚未成功同步时，到达设定钟点触发补齐（重启不会重复触发），二者顺序执行（VOD 先，EPG 后），避免线程池叠加压服务器。
+                            任一任务失败每小时自动重试，当日超过上限后次日重置。
+                        </p>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" @click="saveSchedulerConfig" :disabled="savingScheduler" style="width: 100%;">
+                                <span class="spinner" v-if="savingScheduler"></span>
+                                {{ savingScheduler ? '正在保存...' : '💾 保存定时设置' }}
+                            </button>
+                        </div>
+
+                        <div class="status-list" style="margin-top: 18px;">
+                            <div class="status-item">
+                                <span class="status-label">实际运行状态</span>
+                                <span :class="schedulerStatus.running ? 'status-val text-success' : 'status-val text-muted'">
+                                    {{ schedulerStatus.running ? '🟢 运行中' : '⭕ 已暂停' }}
+                                </span>
+                            </div>
+
+                            <div class="status-item" v-for="(t, name) in schedulerStatus.tasks" :key="name">
+                                <span class="status-label">{{ taskLabels[name] || name }}</span>
+                                <span class="status-val">
+                                    <template v-if="schedulerStatus.config && schedulerStatus.config[name + '_sync_enabled'] === false">
+                                        <span class="text-muted">⛔ 已禁用</span>
+                                    </template>
+                                    <template v-else>
+                                        <span :class="t.done_today ? 'text-success' : (t.gave_up ? 'text-error' : 'text-muted')">
+                                            {{ t.done_today ? '✅ 今日已同步' : (t.gave_up ? '❌ 今日放弃' : (t.retrying ? '🔁 待重试' : '⏳ 待执行')) }}
+                                        </span>
+                                        <span class="text-muted" style="margin-left: 8px;">上次 {{ formatTime(t.last_sync_time) }}</span>
+                                    </template>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -215,7 +318,7 @@
                                 {{ syncStatus.running ? '⏳ 同步中...' : '🔄 开始全量同步' }}
                             </button>
                             <small v-if="!simStatus.is_authenticated" style="color: var(--text-muted); display: block; margin-top: 8px;">
-                                ⚠️ 请先在「系统凭证配置」页面完成登录认证
+                                ⚠️ 请先在「系统配置」页面完成登录认证
                             </small>
                         </div>
                     </div>
@@ -528,6 +631,26 @@
                         <p class="status-desc" style="margin-top:16px;">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
                     </div>
                 </div>
+                <div class="card" style="margin-top:20px;"><div class="card-header"><h3>EPG 配置</h3></div>
+                    <div class="form-group inline-checkbox-group" style="margin-top:15px;margin-bottom:15px;">
+                        <label class="switch-item">
+                            <label class="switch-toggle">
+                                <input type="checkbox" v-model="epgConfig.epg_auto_sync_bool">
+                                <span class="switch-slider"></span>
+                            </label>
+                            <span class="switch-label-text">🔄 启用 EPG 自动同步</span>
+                        </label>
+                        <small class="form-help text-muted">EPG 自动同步总开关（配置已接入 epg_config，供定时调度读取）。</small>
+                    </div>
+                    <div class="form-group" style="margin-bottom:15px;">
+                        <label>EPG XML 地址</label>
+                        <input type="text" v-model="epgConfig.epg_url" placeholder="例如: http://192.168.1.3:6688/epg.xml.gz">
+                        <small class="form-help">将作为 x-tvg-url 写入 M3U 首行头。</small>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" @click="saveEpgConfig" style="width:100%;">💾 保存 EPG 配置</button>
+                    </div>
+                </div>
                 <div class="card" style="margin-top:20px;"><div class="card-header"><h3>当前正在播放</h3><button class="btn btn-secondary btn-sm" @click="fetchNowPlaying">刷新</button></div>
                     <div class="live-ch-list" style="margin-top:10px;max-height:400px;overflow-y:auto;">
                         <div v-if="nowPlaying.length===0" style="padding:20px;text-align:center;color:var(--text-muted);">{{ nowPlayingLoaded?'无正在播放节目':'点击刷新' }}</div>
@@ -631,11 +754,6 @@
                             <label>udpxy 代理服务地址</label>
                             <input type="text" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688" :disabled="!liveConfig.udpxy_enabled_bool">
                             <small class="form-help">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label>EPG XML 地址</label>
-                            <input type="text" v-model="liveConfig.epg_url" placeholder="例如: http://192.168.1.3:6688/epg.xml.gz">
-                            <small class="form-help">将作为 x-tvg-url 写入 M3U 首行头。</small>
                         </div>
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label>LOGO 基础 URL</label>

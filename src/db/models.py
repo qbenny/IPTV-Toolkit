@@ -17,7 +17,9 @@ def get_db_connection() -> sqlite3.Connection:
         sqlite3.Connection 实例，row_factory 设置为 sqlite3.Row
     """
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    # timeout=30：并发写（同步线程 + API 写）时把写锁等待从默认 5s 提升到 30s，
+    # 减少偶发 "database is locked"；check_same_thread 默认 True（连接不跨线程），安全。
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
@@ -111,6 +113,7 @@ def init_db():
             fec_port          TEXT DEFAULT '',
             raw_fields_json   TEXT DEFAULT '',
             back_time         INTEGER DEFAULT 0,
+            channel_code      TEXT DEFAULT '',
             synced_at         INTEGER DEFAULT 0,
             created_at        INTEGER DEFAULT 0
         )
@@ -123,6 +126,17 @@ def init_db():
             value TEXT DEFAULT ''
         )
     """)
+
+    # 第 3 步：拆表准备 —— 各领域独立配置表（与 live_config 同结构 KV）
+    # live_config 已清理为纯直播配置（其余 key 已分流到 vod_config/scheduler_config/epg_config），本步仅新增表并把数据分流过去。
+    for tbl in ("vod_config", "scheduler_config", "epg_config"):
+        c.execute(f"""
+            CREATE TABLE IF NOT EXISTS {tbl} (
+                key   TEXT PRIMARY KEY,
+                value TEXT DEFAULT ''
+            )
+        """)
+
 
     # 频道别名映射表
     c.execute("""
@@ -147,6 +161,13 @@ def init_db():
     except sqlite3.OperationalError:
         c.execute("ALTER TABLE live_channels ADD COLUMN back_time INTEGER DEFAULT 0")
         logger.info("[DB] 迁移：已添加 live_channels.back_time 列")
+
+    # 数据库迁移：为旧库添加 channel_code 列（EPG 同步免登录：存储 VIS channelCode）
+    try:
+        c.execute("SELECT channel_code FROM live_channels LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE live_channels ADD COLUMN channel_code TEXT DEFAULT ''")
+        logger.info("[DB] 迁移：已添加 live_channels.channel_code 列")
 
     # 数据库迁移：为旧库添加 first_seen_at 列（记录内容首次出现时间）
     try:
@@ -187,14 +208,15 @@ def init_db():
     default_configs = {
         "udpxy_enabled": "1",
         "udpxy_address": "",
-        "m3u_auth_required": "0",
         "fcc_global_enabled": "0",
         "timeshift_enabled": "1",
-        "epg_url": "",
         "logo_base_url": "/static/logo/",
         "m3u_dual_line": "0",
         "low_quality_filter": "1",  # 低质量视频过滤开关（长标题+无评分=垃圾）
         "m3u8_filter": "1",         # m3u8 内容池过滤开关（JHT/YANHUA/YANKUM）
+        "live_sync_hour": "0",      # 定时直播同步触发钟点（0-23），首次登录也会顺带触发
+        "vod_sync_hour": "1",       # 定时 VOD 同步触发钟点（0-23，免登录）
+        "epg_sync_hour": "1",       # 定时 EPG 同步触发钟点（0-23，免登录）
     }
     for k, v in default_configs.items():
         c.execute("""
@@ -215,7 +237,59 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_epg_channel ON epg_programs(channel_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_epg_date ON epg_programs(program_date)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_epg_epg_ch ON epg_programs(epg_channel_id)")
-    c.execute("INSERT OR IGNORE INTO live_config(key,value) VALUES('epg_auto_sync','1')")
+    # ---- 第 3 步：把 live_config 中各领域 key 分流到新表（幂等，真实值优先）----
+    # 顺序：先迁移 live_config 真实值 -> 新表（INSERT OR IGNORE 不覆盖已有），
+    #       再补各领域默认值（仅缺失时）。
+    _config_migrate_keys = {
+        "vod_config": ("low_quality_filter", "m3u8_filter"),
+        "scheduler_config": (
+            "live_sync_hour", "vod_sync_hour", "epg_sync_hour",
+            "scheduler_enabled", "live_sync_enabled",
+            "vod_sync_enabled", "epg_sync_enabled",
+        ),
+        "epg_config": ("epg_auto_sync", "epg_url"),
+    }
+    _config_defaults = {
+        "vod_config": {"low_quality_filter": "1", "m3u8_filter": "1"},
+        "scheduler_config": {
+            "live_sync_hour": "0", "vod_sync_hour": "1", "epg_sync_hour": "1",
+            "scheduler_enabled": "1", "live_sync_enabled": "1",
+            "vod_sync_enabled": "1", "epg_sync_enabled": "1",
+        },
+        "epg_config": {"epg_auto_sync": "1", "epg_url": ""},
+    }
+    for tbl, keys in _config_migrate_keys.items():
+        for k in keys:
+            c.execute(
+                f"INSERT OR IGNORE INTO {tbl} (key, value) "
+                f"SELECT key, value FROM live_config WHERE key=?",
+                (k,),
+            )
+    for tbl, defaults in _config_defaults.items():
+        for k, v in defaults.items():
+            c.execute(f"INSERT OR IGNORE INTO {tbl} (key, value) VALUES (?, ?)", (k, v))
+
+    # ---- 第 5 步：清理 live_config 中的孤儿 key ----
+    # 两类孤儿：
+    #  (a) 已分流到新表的 key（vod_config/scheduler_config/epg_config），代码不再读
+    #      live_config 的它们（crud 读 vod_config、scheduler_engine 读 scheduler_config、
+    #      api/scheduler 读 scheduler_config、M3U 生成读 epg_config.epg_url）。
+    #  (b) 旧同步子系统遗留的 sync_channels_*/sync_vod_*/sync_epg_* 开关——全仓库已无任何
+    #      代码读取，属死键，一并清除。
+    # 清理后 live_config 仅保留纯直播配置（udpxy/fcc/timeshift/logo/m3u 等）。
+    _orphan_keys = []
+    for _keys in _config_migrate_keys.values():
+        _orphan_keys.extend(_keys)
+    _legacy_sync_keys = (
+        "sync_channels_enabled", "sync_channels_schedule_type", "sync_channels_schedule_value",
+        "sync_vod_enabled", "sync_vod_schedule_type", "sync_vod_schedule_value",
+        "sync_epg_enabled", "sync_epg_schedule_type", "sync_epg_schedule_value",
+    )
+    _orphan_keys.extend(_legacy_sync_keys)
+    _orphan_keys.append("m3u_auth_required")  # 历史遗留开关，从未被读取，一并清除
+    if _orphan_keys:
+        _qmarks = ",".join("?" * len(_orphan_keys))
+        c.execute(f"DELETE FROM live_config WHERE key IN ({_qmarks})", _orphan_keys)
 
     conn.commit()
     conn.close()

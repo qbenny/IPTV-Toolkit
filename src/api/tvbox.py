@@ -430,8 +430,7 @@ def _build_recommend_list() -> list:
 
 
 async def _handle_detail(ids: str, sim) -> JSONResponse:
-    """处理视频详情请求（实时从 EPG 解析播放地址）。"""
-    from src.utils.helpers import parse_epg_json
+    """处理视频详情请求（实时从 EPG 解析播放地址）。被顶号自愈由 simulator 层统一处理。"""
     from src.auth.heartbeat import ensure_authenticated
 
     if sim is None:
@@ -451,17 +450,8 @@ async def _handle_detail(ids: str, sim) -> JSONResponse:
             if not sim.state.is_authenticated:
                 continue
 
-            data_url = f"{sim.state.epg_base_url}/EPG/jsp/gdhdpublic/Ver.2/common/data.jsp"
-
-            # A. contentCode -> vod_id
-            params_code = {
-                "Action": "vodIdByCode",
-                "foreignSN": item_code,
-                "contentType": "0"
-            }
-            res_code = sim.state.session.get(data_url, params=params_code, headers=sim.config.headers, timeout=10)
-            data_code = parse_epg_json(res_code.text)
-            vod_id = data_code.get("result", {}).get("id")
+            # A. contentCode -> vod_id（被顶号时由 simulator 层自动清状态重登录重试）
+            vod_id = sim.get_vod_id_by_code(item_code)
             if not vod_id:
                 continue
             vod_id = str(vod_id)

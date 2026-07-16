@@ -6,6 +6,7 @@ import sqlite3
 from typing import Optional
 
 from src.db.models import get_db_connection
+from src.db.config_store import cfg_get
 from src.utils.logger import logger
 
 # 地区归一化映射表
@@ -126,16 +127,9 @@ _M3U8_EXCLUDE_PARAMS = list(_M3U8_POOLS)
 _M3U8_FILTER_CONFIG_KEY = "m3u8_filter"
 
 def _m3u8_filter_enabled() -> bool:
-    """检查 m3u8 池过滤是否启用（默认开启）。"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT value FROM live_config WHERE key=?", (_M3U8_FILTER_CONFIG_KEY,))
-        row = c.fetchone()
-        conn.close()
-        return row is None or row[0] == "1"
-    except Exception:
-        return True
+    """检查 m3u8 池过滤是否启用（默认开启）。读 vod_config 表。"""
+    v = cfg_get(_M3U8_FILTER_CONFIG_KEY, None, "vod_config")
+    return v is None or v == "1"
 
 
 def _m3u8_exclude_sql() -> tuple:
@@ -149,16 +143,9 @@ _LQ_FILTER_CONFIG_KEY = "low_quality_filter"
 
 
 def _low_quality_enabled() -> bool:
-    """检查低质量过滤是否启用（默认开启）。"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT value FROM live_config WHERE key=?", (_LQ_FILTER_CONFIG_KEY,))
-        row = c.fetchone()
-        conn.close()
-        return row is None or row[0] == "1"  # 不存在或值为"1"都算开启
-    except Exception:
-        return True  # 容错
+    """检查低质量过滤是否启用（默认开启）。读 vod_config 表。"""
+    v = cfg_get(_LQ_FILTER_CONFIG_KEY, None, "vod_config")
+    return v is None or v == "1"  # 不存在或值为"1"都算开启
 
 
 def _low_quality_sql(db_type: str = None) -> tuple:
@@ -416,49 +403,26 @@ def get_stats() -> dict:
     }
 
 
-def get_unique_values(column: str, type_name: str = None) -> list:
-    """获取某个字段的去重值列表（用于生成过滤器选项）。
-
-    Args:
-        column: 列名（如 country, year）
-        type_name: 可选，限制类型
-
-    Returns:
-        去重后的值列表（降序排列）
-    """
-    conn = get_db_connection()
-    c = conn.cursor()
-    if type_name:
-        c.execute(f"""
-            SELECT DISTINCT {column} FROM vod_items
-            WHERE type = ? AND {column} != ''
-            ORDER BY {column} DESC
-        """, (type_name,))
-    else:
-        c.execute(f"""
-            SELECT DISTINCT {column} FROM vod_items
-            WHERE {column} != ''
-            ORDER BY {column} DESC
-        """)
-    values = [row[0] for row in c.fetchall()]
-    conn.close()
-    return values
-
-
-def clean_old_data(sync_time: int):
+def clean_old_data(sync_time: int, type_name: str = None):
     """删除同步时间戳不是指定值的旧数据（全量覆盖用）。
 
     Args:
         sync_time: 当前批次同步时间戳，不等于此值的数据将被删除
+        type_name: 仅清理指定分类（None 表示全部分类）。用于部分分类同步失败时，
+                   只清理成功拉取到的分类，避免把失败分类的现有数据一并清掉。
     """
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM vod_items WHERE syncedAt != ?", (sync_time,))
+    if type_name:
+        c.execute("DELETE FROM vod_items WHERE type = ? AND syncedAt != ?", (type_name, sync_time))
+    else:
+        c.execute("DELETE FROM vod_items WHERE syncedAt != ?", (sync_time,))
     deleted = c.rowcount
     conn.commit()
     conn.close()
     if deleted > 0:
-        logger.info(f"[DB] 清理 {deleted} 条过期数据")
+        scope = type_name or "全部"
+        logger.info(f"[DB] 清理 {deleted} 条过期数据（{scope}）")
 
 
 if __name__ == "__main__":
@@ -500,10 +464,6 @@ if __name__ == "__main__":
     # 测试过滤
     result = filter_items("movies")
     print(f">>> 过滤 movies: {result['total']} 条")
-
-    # 测试 get_unique_values
-    countries = get_unique_values("country")
-    print(f">>> 国家列表: {countries}")
 
     # 清理测试数据
     clean_old_data(0)

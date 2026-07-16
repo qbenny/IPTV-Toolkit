@@ -34,6 +34,7 @@
     
     --color-success: #10b981;
     --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-warning: #f59e0b;
     --color-error: #ef4444;
     --color-error-bg: rgba(239, 68, 68, 0.1);
     
@@ -68,6 +69,7 @@
     
     --color-success: #059669;
     --color-success-bg: rgba(5, 150, 105, 0.1);
+    --color-warning: #d97706;
     --color-error: #dc2626;
     --color-error-bg: rgba(220, 38, 38, 0.1);
     
@@ -364,6 +366,44 @@ body {
     box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
+/* 定时同步：三列下拉框，与工具栏 select 风格统一 */
+.scheduler-form-grid {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+    .scheduler-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.scheduler-form-grid .form-group select,
+.scheduler-select {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+[data-theme="light"] .scheduler-form-grid .form-group select,
+[data-theme="light"] .scheduler-select {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.scheduler-form-grid .form-group select:focus,
+.scheduler-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+}
+
+
 .checkbox-label {
     display: flex;
     align-items: center;
@@ -508,6 +548,20 @@ body {
 .status-val.text-muted {
     color: var(--text-muted);
 }
+
+.status-val.text-warning {
+    color: var(--color-warning, var(--color-error));
+}
+
+.status-val.text-error,
+.text-error {
+    color: var(--color-error);
+}
+
+.text-warning {
+    color: var(--color-warning, var(--color-error));
+}
+
 
 .token-val {
     display: flex;

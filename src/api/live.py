@@ -8,6 +8,7 @@ import os
 import requests
 from typing import Optional, List
 from src.db.models import get_db_connection
+from src.db.config_store import cfg_get, cfg_get_all, cfg_bulk_set
 from src.utils.logger import logger
 from src.utils.normalize import normalize_epg, normalize_logo
 
@@ -15,6 +16,13 @@ router = APIRouter(prefix="/api/live", tags=["live"])
 
 _simulator = None
 _login_func = None
+
+# 直播同步状态（供 API / Web / 定时调度统一读取）
+live_sync_status = {
+    "running": False,
+    "last_sync_time": 0,
+    "last_error": None,
+}
 
 
 def set_simulator(sim):
@@ -28,12 +36,7 @@ def set_login_func(func):
 
 
 def get_live_configs() -> dict:
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT key, value FROM live_config")
-    rows = c.fetchall()
-    conn.close()
-    return {row["key"]: row["value"] for row in rows}
+    return cfg_get_all("live_config")
 
 
 def get_alias_map() -> dict:
@@ -141,14 +144,216 @@ async def get_live_config():
 
 @router.put("/config")
 async def update_live_config(new_configs: dict):
-    """批量更新直播配置。"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    for k, v in new_configs.items():
-        c.execute("INSERT OR REPLACE INTO live_config (key, value) VALUES (?, ?)", (k, str(v)))
-    conn.commit()
-    conn.close()
+    """批量更新直播配置（纯直播配置；VOD 过滤开关已分流到 vod_config）。"""
+    cfg_bulk_set(new_configs, "live_config")
     return {"status": "success"}
+
+
+def run_live_sync(sim, login_func=None) -> dict:
+    """执行直播频道同步（API 与定时调度共用）。
+
+    登录失败 / 同步异常均返回 {"status": "error", ...}，不抛出，便于调度器判断重试。
+    """
+    global live_sync_status
+    if live_sync_status["running"]:
+        return {"status": "error", "message": "直播同步正在进行中，跳过"}
+    live_sync_status["running"] = True
+    live_sync_status["last_error"] = None
+    try:
+        if not sim.state.is_authenticated:
+            logger.info("[Live Sync] 模拟器未登录，尝试登录...")
+            login_success = login_func() if login_func else sim.login()
+            if not login_success:
+                live_sync_status["last_error"] = "模拟器登录失败，无法同步"
+                return {"status": "error", "message": "模拟器登录失败，无法同步"}
+
+        try:
+            sim_channels = sim.get_channel_list()
+            if not sim_channels:
+                logger.warning("[Live Sync] 首次拉取未解析出任何频道（可能 Token 已失效），尝试登录刷新会话...")
+                login_success = login_func() if login_func else sim.login()
+                if login_success:
+                    logger.info("[Live Sync] 重新登录成功，进行第二次频道拉取...")
+                    sim_channels = sim.get_channel_list()
+
+            if not sim_channels:
+                return {"status": "success", "count": 0, "disabled": 0, "message": "同步完成，未发现可用频道"}
+
+            sync_time = int(time.time())
+            alias_map = get_alias_map()
+
+            # 获取频道编码映射（channelListAll）：落库 channel_code 供 EPG 免登录同步 + 回看天数 back_time
+            code_map = {}
+            try:
+                code_map = sim.get_channel_code_mapping()
+            except Exception as e:
+                logger.warning("[Live Sync] 获取频道编码映射失败（EPG 同步将暂不可用，请检查登录态）: %s", e)
+            conn = get_db_connection()
+            c = conn.cursor()
+
+            c.execute("SELECT MAX(synced_at) as max_sync FROM live_channels WHERE source = 'server'")
+            row = c.fetchone()
+            last_sync_time = row["max_sync"] if row and row["max_sync"] else 0
+
+            added_count = 0
+            updated_count = 0
+
+            for ch in sim_channels:
+                channel_id = ch["channel_id"]
+                code_info = code_map.get(channel_id) or {}
+                ch_code = code_info.get("code", "")
+                ch_back_time = code_info.get("backTime", 0)
+
+                c.execute("SELECT id, is_enabled, synced_at FROM live_channels WHERE channel_id = ? AND source = 'server'", (channel_id,))
+                existing = c.fetchone()
+
+                if existing:
+                    is_enabled = existing["is_enabled"]
+                    if is_enabled == 0:
+                        if existing["synced_at"] < last_sync_time:
+                            is_enabled = 1
+                            logger.info(f"[Live Sync] 频道 {ch['name']} (ID: {channel_id}) 重新上线，自动恢复启用")
+
+                    resolved = resolve_channel_names(ch["name"], alias_map)
+
+                    c.execute("""
+                        UPDATE live_channels SET
+                            user_channel_id = ?,
+                            name = ?,
+                            display_name = ?,
+                            tvg_id = ?,
+                            tvg_name = ?,
+                            logo_url = ?,
+                            multicast_url = ?,
+                            unicast_url = ?,
+                            unicast_url_full = ?,
+                            timeshift_enabled = ?,
+                            timeshift_length = ?,
+                            timeshift_url = ?,
+                            is_hd = ?,
+                            channel_type = ?,
+                            channel_sdp = ?,
+                            channel_url_raw = ?,
+                            channel_locked = ?,
+                            preview_enabled = ?,
+                            fcc_enabled = ?,
+                            fcc_ip = ?,
+                            fcc_port = ?,
+                            fec_port = ?,
+                            raw_fields_json = ?,
+                            channel_code = ?,
+                            back_time = ?,
+                            synced_at = ?,
+                            is_enabled = ?
+                        WHERE id = ?
+                    """, (
+                        ch["user_channel_id"],
+                        ch["name"],
+                        resolved["display_name"],
+                        resolved["tvg_id"],
+                        resolved["tvg_name"],
+                        resolved["logo_url"],
+                        ch["multicast_url"],
+                        ch["unicast_url"],
+                        ch["unicast_url_full"],
+                        ch["timeshift_enabled"],
+                        ch["timeshift_length"],
+                        ch["timeshift_url"],
+                        ch["is_hd"],
+                        ch["channel_type"],
+                        ch["channel_sdp"],
+                        ch["channel_url_raw"],
+                        ch["channel_locked"],
+                        ch["preview_enabled"],
+                        ch["fcc_enabled"],
+                        ch["fcc_ip"],
+                        ch["fcc_port"],
+                        ch["fec_port"],
+                        ch["raw_fields_json"],
+                        ch_code,
+                        ch_back_time,
+                        sync_time,
+                        is_enabled,
+                        existing["id"]
+                    ))
+                    updated_count += 1
+                else:
+                    resolved = resolve_channel_names(ch["name"], alias_map)
+                    c.execute("""
+                        INSERT INTO live_channels (
+                            source, channel_id, user_channel_id, name, display_name,
+                            tvg_id, tvg_name, logo_url, category_id, sort_index, is_enabled,
+                            multicast_url, unicast_url, unicast_url_full, timeshift_enabled,
+                            timeshift_length, timeshift_url, is_hd, channel_type, channel_sdp,
+                            channel_url_raw, channel_locked, preview_enabled, fcc_enabled,
+                            fcc_ip, fcc_port, fec_port, raw_fields_json, channel_code, back_time,
+                            synced_at, created_at
+                        ) VALUES (
+                            'server', ?, ?, ?, ?,
+                            ?, ?, ?, 0, 0, 1,
+                            ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?,
+                            ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?, ?, ?
+                        )
+                    """, (
+                        channel_id,
+                        ch["user_channel_id"],
+                        resolved["name"],
+                        resolved["display_name"],
+                        resolved["tvg_id"],
+                        resolved["tvg_name"],
+                        resolved["logo_url"],
+                        ch["multicast_url"],
+                        ch["unicast_url"],
+                        ch["unicast_url_full"],
+                        ch["timeshift_enabled"],
+                        ch["timeshift_length"],
+                        ch["timeshift_url"],
+                        ch["is_hd"],
+                        ch["channel_type"],
+                        ch["channel_sdp"],
+                        ch["channel_url_raw"],
+                        ch["channel_locked"],
+                        ch["preview_enabled"],
+                        ch["fcc_enabled"],
+                        ch["fcc_ip"],
+                        ch["fcc_port"],
+                        ch["fec_port"],
+                        ch["raw_fields_json"],
+                        ch_code,
+                        ch_back_time,
+                        sync_time,
+                        sync_time
+                    ))
+                    added_count += 1
+
+            c.execute("""
+                UPDATE live_channels
+                SET is_enabled = 0
+                WHERE source = 'server' AND synced_at != ? AND is_enabled = 1
+            """, (sync_time,))
+            disabled_count = c.rowcount
+
+            conn.commit()
+            conn.close()
+
+            msg = f"同步完成。新增 {added_count} 个频道，更新 {updated_count} 个频道，下线并禁用 {disabled_count} 个频道。"
+            logger.info(f"[Live Sync] {msg}")
+            live_sync_status["last_sync_time"] = sync_time
+            return {
+                "status": "success",
+                "count": added_count + updated_count,
+                "disabled": disabled_count,
+                "message": msg
+            }
+
+        except Exception as e:
+            logger.error(f"[Live Sync] 同步频道异常: {e}", exc_info=True)
+            live_sync_status["last_error"] = str(e)
+            return {"status": "error", "message": f"同步异常: {e}"}
+    finally:
+        live_sync_status["running"] = False
 
 
 @router.post("/sync")
@@ -156,188 +361,14 @@ async def sync_channels():
     """从 IPTV 网关同步频道列表。"""
     if _simulator is None:
         raise HTTPException(status_code=500, detail="STB 模拟器未初始化")
-        
-    if not _simulator.state.is_authenticated:
-        logger.info("[Live Sync] 模拟器处于未登录状态，尝试登录...")
-        login_success = False
-        if _login_func:
-            login_success = _login_func()
-        else:
-            login_success = _simulator.login()
-        if not login_success:
-            return JSONResponse(status_code=401, content={"status": "error", "message": "模拟器登录失败，无法同步"})
 
-    try:
-        sim_channels = _simulator.get_channel_list()
-        if not sim_channels:
-            logger.warning("[Live Sync] 首次拉取未解析出任何频道（可能 Token 已失效），尝试登录刷新会话...")
-            login_success = False
-            if _login_func:
-                login_success = _login_func()
-            else:
-                login_success = _simulator.login()
-            
-            if login_success:
-                logger.info("[Live Sync] 重新登录成功，进行第二次频道拉取...")
-                sim_channels = _simulator.get_channel_list()
-                
-        if not sim_channels:
-            return {"status": "success", "count": 0, "disabled": 0, "message": "同步完成，未发现可用频道"}
-            
-        sync_time = int(time.time())
-        alias_map = get_alias_map()
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        c.execute("SELECT MAX(synced_at) as max_sync FROM live_channels WHERE source = 'server'")
-        row = c.fetchone()
-        last_sync_time = row["max_sync"] if row and row["max_sync"] else 0
-        
-        added_count = 0
-        updated_count = 0
-        
-        for ch in sim_channels:
-            channel_id = ch["channel_id"]
-            
-            c.execute("SELECT id, is_enabled, synced_at FROM live_channels WHERE channel_id = ? AND source = 'server'", (channel_id,))
-            existing = c.fetchone()
-            
-            if existing:
-                is_enabled = existing["is_enabled"]
-                if is_enabled == 0:
-                    if existing["synced_at"] < last_sync_time:
-                        is_enabled = 1
-                        logger.info(f"[Live Sync] 频道 {ch['name']} (ID: {channel_id}) 重新上线，自动恢复启用")
-                
-                resolved = resolve_channel_names(ch["name"], alias_map)
-                
-                c.execute("""
-                    UPDATE live_channels SET
-                        user_channel_id = ?,
-                        name = ?,
-                        display_name = ?,
-                        tvg_id = ?,
-                        tvg_name = ?,
-                        logo_url = ?,
-                        multicast_url = ?,
-                        unicast_url = ?,
-                        unicast_url_full = ?,
-                        timeshift_enabled = ?,
-                        timeshift_length = ?,
-                        timeshift_url = ?,
-                        is_hd = ?,
-                        channel_type = ?,
-                        channel_sdp = ?,
-                        channel_url_raw = ?,
-                        channel_locked = ?,
-                        preview_enabled = ?,
-                        fcc_enabled = ?,
-                        fcc_ip = ?,
-                        fcc_port = ?,
-                        fec_port = ?,
-                        raw_fields_json = ?,
-                        synced_at = ?,
-                        is_enabled = ?
-                    WHERE id = ?
-                """, (
-                    ch["user_channel_id"],
-                    ch["name"],
-                    resolved["display_name"],
-                    resolved["tvg_id"],
-                    resolved["tvg_name"],
-                    resolved["logo_url"],
-                    ch["multicast_url"],
-                    ch["unicast_url"],
-                    ch["unicast_url_full"],
-                    ch["timeshift_enabled"],
-                    ch["timeshift_length"],
-                    ch["timeshift_url"],
-                    ch["is_hd"],
-                    ch["channel_type"],
-                    ch["channel_sdp"],
-                    ch["channel_url_raw"],
-                    ch["channel_locked"],
-                    ch["preview_enabled"],
-                    ch["fcc_enabled"],
-                    ch["fcc_ip"],
-                    ch["fcc_port"],
-                    ch["fec_port"],
-                    ch["raw_fields_json"],
-                    sync_time,
-                    is_enabled,
-                    existing["id"]
-                ))
-                updated_count += 1
-            else:
-                resolved = resolve_channel_names(ch["name"], alias_map)
-                c.execute("""
-                    INSERT INTO live_channels (
-                        source, channel_id, user_channel_id, name, display_name,
-                        tvg_id, tvg_name, logo_url, category_id, sort_index, is_enabled,
-                        multicast_url, unicast_url, unicast_url_full, timeshift_enabled,
-                        timeshift_length, timeshift_url, is_hd, channel_type, channel_sdp,
-                        channel_url_raw, channel_locked, preview_enabled, fcc_enabled,
-                        fcc_ip, fcc_port, fec_port, raw_fields_json, synced_at, created_at
-                    ) VALUES (
-                        'server', ?, ?, ?, ?,
-                        ?, ?, ?, 0, 0, 1,
-                        ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?
-                    )
-                """, (
-                    channel_id,
-                    ch["user_channel_id"],
-                    resolved["name"],
-                    resolved["display_name"],
-                    resolved["tvg_id"],
-                    resolved["tvg_name"],
-                    resolved["logo_url"],
-                    ch["multicast_url"],
-                    ch["unicast_url"],
-                    ch["unicast_url_full"],
-                    ch["timeshift_enabled"],
-                    ch["timeshift_length"],
-                    ch["timeshift_url"],
-                    ch["is_hd"],
-                    ch["channel_type"],
-                    ch["channel_sdp"],
-                    ch["channel_url_raw"],
-                    ch["channel_locked"],
-                    ch["preview_enabled"],
-                    ch["fcc_enabled"],
-                    ch["fcc_ip"],
-                    ch["fcc_port"],
-                    ch["fec_port"],
-                    ch["raw_fields_json"],
-                    sync_time,
-                    sync_time
-                ))
-                added_count += 1
-                
-        c.execute("""
-            UPDATE live_channels 
-            SET is_enabled = 0 
-            WHERE source = 'server' AND synced_at != ? AND is_enabled = 1
-        """, (sync_time,))
-        disabled_count = c.rowcount
-        
-        conn.commit()
-        conn.close()
-        
-        msg = f"同步完成。新增 {added_count} 个频道，更新 {updated_count} 个频道，下线并禁用 {disabled_count} 个频道。"
-        logger.info(f"[Live Sync] {msg}")
-        return {
-            "status": "success",
-            "count": added_count + updated_count,
-            "disabled": disabled_count,
-            "message": msg
-        }
-        
-    except Exception as e:
-        logger.error(f"[Live Sync] 同步频道异常: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"同步异常: {e}")
+    result = run_live_sync(_simulator, _login_func)
+    if result.get("status") == "error":
+        # 登录失败 → 401；其余同步异常 → 500
+        if "登录失败" in result.get("message", ""):
+            return JSONResponse(status_code=401, content=result)
+        raise HTTPException(status_code=500, detail=result.get("message", "同步异常"))
+    return result
 
 
 @router.get("/channels")
@@ -379,7 +410,9 @@ async def get_channels(
     
     query = f"""
         SELECT c.*, cat.name as category_name, cat.color as category_color,
-               (SELECT COUNT(DISTINCT program_date) FROM epg_programs WHERE channel_id = c.channel_id OR (c.tvg_id != '' AND epg_channel_id = c.tvg_id)) as epg_days
+               (SELECT COUNT(DISTINCT program_date) FROM epg_programs
+                  WHERE (c.channel_id != '' AND channel_id = c.channel_id)
+                     OR (c.tvg_id != '' AND epg_channel_id = c.tvg_id)) as epg_days
         FROM live_channels c
         LEFT JOIN live_categories cat ON c.category_id = cat.id
         {where_str}
@@ -963,7 +996,10 @@ async def import_channels(
         
     conn = get_db_connection()
     c = conn.cursor()
-    
+
+    # 加载别名映射，导入外部频道时即应用规范名
+    alias_map = get_alias_map()
+
     c.execute("SELECT channel_id, multicast_url FROM live_channels")
     existing_rows = c.fetchall()
     
@@ -1031,13 +1067,21 @@ async def import_channels(
             continue
             
         category_id = resolve_category(group_title)
-        tvg_id = item.get("tvg_id", name) or name
-        tvg_name = item.get("tvg_name", name) or name
-        logo_url = item.get("logo_url", "")
-        display_name = name
-        
-        if logo_url:
-            logo_url = os.path.basename(logo_url)
+        # 应用别名映射：命中则用规范名推导 tvg_id/tvg_name/logo_url
+        alias_target = alias_map.get(name)
+        if alias_target:
+            display_name = alias_target
+            base_epg = normalize_epg(alias_target)
+            tvg_id = base_epg
+            tvg_name = base_epg
+            logo_url = normalize_logo(alias_target) + ".png"
+        else:
+            tvg_id = item.get("tvg_id", name) or name
+            tvg_name = item.get("tvg_name", name) or name
+            display_name = name
+            logo_url = item.get("logo_url", "")
+            if logo_url:
+                logo_url = os.path.basename(logo_url)
             
         c.execute("""
             INSERT INTO live_channels (
@@ -1078,11 +1122,15 @@ def _apply_alias_to_channels(c, source_name: str, target_name: str) -> int:
 
     Args:
         c: 数据库 cursor
-        source_name: 服务器原始名称
+        source_name: 频道原始名称（name 字段）
         target_name: 规范名称
 
     Returns:
         受影响的频道数量
+
+    注意：server 与 external 频道都会命中——server 频道在同步时已通过
+    resolve_channel_names 应用别名；external 频道（外部导入）不同步，
+    只能靠此处（添加/导入时）应用，故不可限定 source='server'。
     """
     display_name = target_name
     base_epg = normalize_epg(target_name)
@@ -1091,7 +1139,7 @@ def _apply_alias_to_channels(c, source_name: str, target_name: str) -> int:
     c.execute("""
         UPDATE live_channels
         SET display_name = ?, tvg_id = ?, tvg_name = ?, logo_url = ?
-        WHERE name = ? AND source = 'server'
+        WHERE name = ?
     """, (display_name, base_epg, base_epg, base_logo + ".png", source_name))
     return c.rowcount
 
@@ -1175,7 +1223,7 @@ async def update_alias(id: int, data: dict):
     # 如果原名改了，旧名的频道回退为原始值
     if old_source and old_source != source_name:
         c.execute(
-            "UPDATE live_channels SET display_name = name WHERE name = ? AND source = 'server'",
+            "UPDATE live_channels SET display_name = name WHERE name = ?",
             (old_source,)
         )
 
@@ -1201,7 +1249,7 @@ async def delete_alias(id: int):
     # 回退匹配频道的 display_name 为原始 name
     if source_name:
         c.execute(
-            "UPDATE live_channels SET display_name = name WHERE name = ? AND source = 'server'",
+            "UPDATE live_channels SET display_name = name WHERE name = ?",
             (source_name,)
         )
 
@@ -1290,7 +1338,7 @@ async def generate_m3u(
     timeshift_enabled_global = configs.get("timeshift_enabled", "1") == "1"
     logo_base_url = configs.get("logo_base_url", "/static/logo/").strip()
     m3u_dual_line = configs.get("m3u_dual_line", "0") == "1"
-    epg_url = configs.get("epg_url", "").strip()
+    epg_url = cfg_get("epg_url", "", "epg_config").strip()
     
     conn = get_db_connection()
     c = conn.cursor()
@@ -1368,7 +1416,19 @@ async def generate_m3u(
         # 时移参数
         catchup_str = ""
         if timeshift_enabled_global and ch["timeshift_enabled"] == 1 and ch["unicast_url"]:
-            catchup_str = f' catchup="default" catchup-source="{ch["unicast_url"]}?playseek=${{(b)yyyyMMddHHmmss}}-${{(e)yyyyMMddHHmmss}}"'
+            # catchup-days 由直播表的 timeshift_length 推算（如 14400 -> 14400/2400 = 6 天），
+            # 比 back_time 更接近运营商实际回看保留时长；enabled 频道至少给 1 天。
+            ts_len = ch["timeshift_length"] or 0
+            catchup_days = max(1, round(ts_len / 2400)) if ts_len > 0 else 0
+            # 同时输出 timeshift（小时单位，N*24）作为备选标签：部分国内衍生播放器只认
+            # timeshift="72" 而不认标准的 catchup-days="3"，两者共存互不冲突，播放器各取所认。
+            catchup_hours = catchup_days * 24
+            catchup_str = (
+                f' catchup="default"'
+                f' catchup-days="{catchup_days}"'
+                f' timeshift="{catchup_hours}"'
+                f' catchup-source="{ch["unicast_url"]}?playseek=${{(b)yyyyMMddHHmmss}}-${{(e)yyyyMMddHHmmss}}"'
+            )
             
         logo_str = f' tvg-logo="{logo_full}"' if logo_full else ""
         
