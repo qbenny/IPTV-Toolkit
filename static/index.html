@@ -188,13 +188,13 @@
                             <span class="badge">scheduler</span>
                         </div>
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 14px;">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="schedulerConfig.scheduler_enabled_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">⏰ 启用定时同步（总开关）</span>
-                            </label>
+                            </div>
                         </div>
                         <div class="scheduler-conditional" :style="{ opacity: schedulerConfig.scheduler_enabled_bool ? 1 : 0.45, pointerEvents: schedulerConfig.scheduler_enabled_bool ? 'auto' : 'none' }">
                             <div class="form-grid scheduler-form-grid">
@@ -219,31 +219,31 @@
                             </div>
                             <div class="form-grid scheduler-form-grid" style="margin-top: 12px;">
                                 <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
-                                    <label class="switch-item">
+                                    <div class="switch-item">
                                         <label class="switch-toggle">
                                             <input type="checkbox" v-model="schedulerConfig.live_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
                                             <span class="switch-slider"></span>
                                         </label>
                                         <span class="switch-label-text">📺 启用直播定时同步</span>
-                                    </label>
+                                    </div>
                                 </div>
                                 <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
-                                    <label class="switch-item">
+                                    <div class="switch-item">
                                         <label class="switch-toggle">
                                             <input type="checkbox" v-model="schedulerConfig.vod_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
                                             <span class="switch-slider"></span>
                                         </label>
                                         <span class="switch-label-text">🎬 启用 VOD 定时同步</span>
-                                    </label>
+                                    </div>
                                 </div>
                                 <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
-                                    <label class="switch-item">
+                                    <div class="switch-item">
                                         <label class="switch-toggle">
                                             <input type="checkbox" v-model="schedulerConfig.epg_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
                                             <span class="switch-slider"></span>
                                         </label>
                                         <span class="switch-label-text">📅 启用 EPG 定时同步</span>
-                                    </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -350,24 +350,24 @@
                     <div class="status-list" style="margin-top: 15px;">
 
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 15px;">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="vodConfig.low_quality_filter_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">🗑️ 过滤低质量内容</span>
-                            </label>
+                            </div>
                             <small class="form-help text-muted">屏蔽 电视剧/综艺 的 ep=0&sc=0 垃圾，纪录 无海报垃圾。电影/少儿/动漫 不受影响。重启 TVBox 生效。</small>
                         </div>
 
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 10px;">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="vodConfig.m3u8_filter_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">📦 屏蔽 m3u8 内容池</span>
-                            </label>
+                            </div>
                             <small class="form-help text-muted">屏蔽 JHT/YANHUA/YANKUM 三个池（~1645 条，格式不兼容）。重启 TVBox 生效。</small>
                         </div>
 
@@ -686,46 +686,46 @@
                     <div class="modal-body">
                         <!-- 开关配置组 -->
                         <div class="form-group inline-checkbox-group" style="margin-top: 10px; margin-bottom: 15px;">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.udpxy_enabled_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">🔗 启用 UDPXY 组播代理模式</span>
-                            </label>
+                            </div>
                             <small class="form-help text-muted">开启后，igmp:// 组播头会被自动转换成 udpxy 的 http:// 代理格式；关闭则保持原始 igmp:// 连接。</small>
                         </div>
                         
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 15px; transition: opacity 0.2s;" :style="{ opacity: liveConfig.udpxy_enabled_bool ? 1 : 0.5, pointerEvents: liveConfig.udpxy_enabled_bool ? 'auto' : 'none' }">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.fcc_global_enabled_bool" :disabled="!liveConfig.udpxy_enabled_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">⚡ 启用全局 FCC 加速</span>
-                            </label>
+                            </div>
                             <small class="form-help text-muted">开启后，若频道支持 FCC，则在 udpxy 转换链接后追加 ?fcc= 提速参数。仅在 UDPXY 模式开启时有效。</small>
                         </div>
                         
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 15px;">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.timeshift_enabled_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">🕒 启用全局时移回看 (Catchup)</span>
-                            </label>
+                            </div>
                             <small class="form-help text-muted">开启后，对支持时移的频道生成 catchup="default" 时移元数据。</small>
                         </div>
                         
                         <div class="form-group inline-checkbox-group" style="margin-bottom: 20px;">
-                            <label class="switch-item">
+                            <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.m3u_dual_line_bool">
                                     <span class="switch-slider"></span>
                                 </label>
                                 <span class="switch-label-text">🛤️ 启用组播+单播双线模式</span>
-                            </label>
+                            </div>
                             <small class="form-help text-muted">开启后，同一频道将同时生成 udpxy 组播和 RTSP 单播两行数据。</small>
                         </div>
 

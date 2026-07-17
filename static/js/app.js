@@ -53,7 +53,7 @@ const app = createApp({
                 running: false, progress: '', current_type: '',
                 done: 0, total: 0, last_sync_time: null, last_error: null
             },
-            dbStats: { total: 0, types: {}, last_synced: 0 },
+            dbStats: { total: 0, types: {} },
             syncStatusTimer: null,
 
             // Plate 4: Live Channel Management
@@ -66,8 +66,9 @@ const app = createApp({
             liveConfig: {
                 udpxy_address: '', logo_base_url: '',
                 fcc_global_enabled_bool: false, timeshift_enabled_bool: false,
-                m3u_dual_line_bool: false
+                m3u_dual_line_bool: false, udpxy_enabled_bool: false
             },
+            loadingConfig: false,
             // VOD 过滤设置（独立于 liveConfig，避免保存时覆盖直播配置）
             vodConfig: {
                 low_quality_filter_bool: true,
@@ -82,11 +83,9 @@ const app = createApp({
             showCategoryModal: false,
             categorySortableInstance: null,
             categoryTbodyKey: 0,
-            categoryImportCleanMode: false,
             showEditChannelModal: false,
             syncingLive: false,
             presetColors: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#e11d48'],
-            importFormat: 'm3u',
             importMethod: 'text',
             importText: '',
             importFile: null,
@@ -440,10 +439,13 @@ const app = createApp({
                 ta.value = text;
                 ta.style.position = 'fixed'; ta.style.opacity = '0';
                 document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                this.showToast('已复制到剪贴板');
+                try {
+                    ta.select();
+                    document.execCommand('copy');
+                    this.showToast('已复制到剪贴板');
+                } finally {
+                    document.body.removeChild(ta);
+                }
             } catch (e) {
                 this.showToast('复制失败', 'error');
             }
@@ -595,7 +597,6 @@ const app = createApp({
         async fetchNowPlaying() {
             try { const r = await fetch('/api/epg/programs/now'); const data = await r.json(); this.nowPlaying = data.items || []; this.nowPlayingLoaded = true; } catch (e) {}
         },
-        copyEpgXmlLink() { this.copyToClipboard(this.epgXmlLink); },
 
         // ---- Log ----
         async fetchLogs() {
@@ -752,10 +753,7 @@ const app = createApp({
                 const r = await fetch(`/api/live/channels/${ch.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...ch,
-                        is_enabled: next_enabled
-                    })
+                    body: JSON.stringify({ is_enabled: next_enabled })
                 });
                 if (r.ok) {
                     ch.is_enabled = next_enabled;
@@ -767,11 +765,6 @@ const app = createApp({
             } catch (e) {
                 this.showToast('网络错误', 'error');
             }
-        },
-
-        editChannel(ch) {
-            this.editingCh = { ...ch };
-            this.showEditChannelModal = true;
         },
 
         async saveChannelEdit() {
@@ -799,7 +792,7 @@ const app = createApp({
             try {
                 const r = await fetch(`/api/live/channels/${ch.id}`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(ch)
+                    body: JSON.stringify({ category_id: ch.category_id })
                 });
                 if (r.ok) {
                     this.showToast('分类已更新');
@@ -1244,10 +1237,6 @@ const app = createApp({
                 } else { this.showToast(res.detail || '导入失败', 'error'); }
             } catch(e) { this.showToast('文件解析失败，请检查 JSON 格式', 'error'); }
             e.target.value = '';
-        },
-
-        changeLivePage(page) {
-            this.fetchLiveChannels(page);
         },
 
         toggleSelectAll() {
