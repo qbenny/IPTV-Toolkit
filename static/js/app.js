@@ -20,15 +20,13 @@ const app = createApp({
                 stb: '系统配置',
                 sync: '数据同步管理',
                 live: '直播频道管理',
-                epg: 'EPG 节目管理',
-                log: '系统日志'
+                epg: 'EPG 节目管理'
             },
             tabSubtitles: {
-                stb: '管理机顶盒仿真认证凭证与定时同步任务',
+                stb: '管理机顶盒仿真认证凭证、定时同步任务与系统日志',
                 sync: '从 VIS API 同步点播数据到本地 SQLite 数据库',
                 live: '管理直播频道、分类、外部导入，生成 M3U 订阅',
-                epg: '从 VIS 节目单 API 同步 EPG 数据，生成 XMLTV',
-                log: '查看系统运行日志，支持级别过滤'
+                epg: '从 VIS 节目单 API 同步 EPG 数据，生成 XMLTV'
             },
 
             // Plate 1: STB Config
@@ -47,6 +45,11 @@ const app = createApp({
             schedulerStatus: { running: false, config: {}, tasks: {} },
             savingScheduler: false,
             taskLabels: { live: '直播频道', vod: 'VOD 点播', epg: 'EPG 节目单' },
+            schedulerTasks: [
+                { key: 'live', icon: '📺', name: '直播', hourKey: 'live_sync_hour', enabledKey: 'live_sync_enabled_bool' },
+                { key: 'epg',  icon: '📅', name: 'EPG', hourKey: 'epg_sync_hour',  enabledKey: 'epg_sync_enabled_bool' },
+                { key: 'vod',  icon: '🎬', name: 'VOD', hourKey: 'vod_sync_hour',  enabledKey: 'vod_sync_enabled_bool' }
+            ],
 
             // Plate 2: Sync
             syncStatus: {
@@ -55,6 +58,7 @@ const app = createApp({
             },
             dbStats: { total: 0, types: {} },
             syncStatusTimer: null,
+            previousSyncRunning: false,
 
             // Plate 4: Live Channel Management
             liveFilter: {
@@ -99,6 +103,7 @@ const app = createApp({
             // Plate 5: EPG
             epgSyncStatus: { running: false, progress: '', last_sync_time: null },
             epgSyncTimer: null,
+            previousEpgRunning: false,
             epgStats: { total_programs: 0, total_channels: 0, date_range: null },
             nowPlaying: [], nowPlayingLoaded: false,
 
@@ -162,7 +167,6 @@ const app = createApp({
                 this.startSimStatusPolling();
                 this.fetchSchedulerConfig();
                 this.fetchSchedulerStatus();
-            } else if (newTab === 'log') {
                 this.startLogPolling();
             } else if (newTab === 'sync') {
                 this.startSyncStatusPolling();
@@ -202,10 +206,9 @@ const app = createApp({
         this.fetchSchedulerStatus();  // 加载调度器运行状态
         if (this.activeTab === 'stb') {
             this.startSimStatusPolling();
+            this.startLogPolling();
         } else if (this.activeTab === 'live') {
             this.initLiveTab();
-        } else if (this.activeTab === 'log') {
-            this.startLogPolling();
         } else if (this.activeTab === 'sync') {
             this.startSyncStatusPolling();
         }
@@ -390,10 +393,10 @@ const app = createApp({
 
         // ---- Polling ----
         stopAllPolling() {
-            [this.simStatusTimer, this.syncStatusTimer, this.logPollTimer, this.schedulerStatusTimer].forEach(t => {
+            [this.simStatusTimer, this.syncStatusTimer, this.logPollTimer, this.schedulerStatusTimer, this.epgSyncTimer].forEach(t => {
                 if (t) { clearInterval(t); }
             });
-            this.simStatusTimer = this.syncStatusTimer = this.logPollTimer = this.schedulerStatusTimer = null;
+            this.simStatusTimer = this.syncStatusTimer = this.logPollTimer = this.schedulerStatusTimer = this.epgSyncTimer = null;
         },
 
         // ---- STB Config ----
@@ -522,6 +525,36 @@ const app = createApp({
             } finally { this.savingScheduler = false; }
         },
 
+        // 调度器任务的"手动同步"入口，按 key 分发到对应 trigger
+        async manualSchedulerSync(key) {
+            if (key === 'live') return this.triggerLiveSync();
+            if (key === 'epg')  return this.triggerEpgSync();
+            if (key === 'vod')  return this.triggerSync();
+        },
+
+        // 任务状态文字（已同步 / 未同步 / 今日放弃 / 待重试 / 待执行 / 已禁用）
+        taskStatusText(key) {
+            const t = this.schedulerStatus.tasks?.[key];
+            const enabled = this.schedulerConfig[`${key}_sync_enabled_bool`];
+            if (!enabled) return '⛔ 已禁用';
+            if (!t) return '⏳ 待执行';
+            if (t.done_today) return '✅ 今日已同步';
+            if (t.gave_up) return '❌ 今日放弃';
+            if (t.retrying) return '🔁 待重试';
+            return '⏳ 待执行';
+        },
+
+        // 任务状态样式类
+        taskStatusClass(key) {
+            const t = this.schedulerStatus.tasks?.[key];
+            const enabled = this.schedulerConfig[`${key}_sync_enabled_bool`];
+            if (!enabled) return 'text-muted';
+            if (!t) return 'text-muted';
+            if (t.done_today) return 'text-success';
+            if (t.gave_up) return 'text-error';
+            return 'text-muted';
+        },
+
         // ---- Sync ----
         async triggerSync() {
             try {
@@ -548,11 +581,13 @@ const app = createApp({
                 if (!this.syncStatus.running && this.syncStatusTimer) {
                     clearInterval(this.syncStatusTimer);
                     this.syncStatusTimer = null;
-                    if (this.syncStatus.last_sync_time) {
+                    // 只在本次轮询"从 running 变 not-running"时才弹 toast
+                    if (this.previousSyncRunning && this.syncStatus.last_sync_time) {
                         this.showToast('同步完成!');
                         this.fetchDbStats();
                     }
                 }
+                this.previousSyncRunning = this.syncStatus.running;
             } catch (e) { /* silent */ }
         },
 
@@ -583,8 +618,19 @@ const app = createApp({
             } catch (e) { this.showToast('通信异常', 'error'); }
         },
         async fetchEpgSyncStatus() {
-            try { const r = await fetch('/api/epg/sync/status'); this.epgSyncStatus = await r.json();
-                if (!this.epgSyncStatus.running && this.epgSyncTimer) { clearInterval(this.epgSyncTimer); this.epgSyncTimer = null; if (this.epgSyncStatus.last_sync_time) { this.showToast('EPG 同步完成!'); this.fetchEpgStats(); } }
+            try {
+                const r = await fetch('/api/epg/sync/status');
+                this.epgSyncStatus = await r.json();
+                if (!this.epgSyncStatus.running && this.epgSyncTimer) {
+                    clearInterval(this.epgSyncTimer);
+                    this.epgSyncTimer = null;
+                    // 只在本次轮询"从 running 变 not-running"时才弹 toast
+                    if (this.previousEpgRunning && this.epgSyncStatus.last_sync_time) {
+                        this.showToast('EPG 同步完成!');
+                        this.fetchEpgStats();
+                    }
+                }
+                this.previousEpgRunning = this.epgSyncStatus.running;
             } catch (e) {}
         },
         async fetchEpgStats() {

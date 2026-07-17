@@ -262,12 +262,15 @@ body {
 .card-grid {
     display: grid;
     grid-template-columns: 3fr 2fr;
-    gap: 24px;
+    gap: 16px;
     align-items: start;
+}
+.card-grid.cols-3 {
+    grid-template-columns: 1fr 1fr 1fr;
 }
 
 @media (max-width: 1024px) {
-    .card-grid {
+    .card-grid, .card-grid.cols-3 {
         grid-template-columns: 1fr;
     }
 }
@@ -403,6 +406,111 @@ body {
     box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
+/* ===== 定时自动同步管理卡片 ===== */
+.scheduler-master {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+}
+.status-pill::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.status-pill.on {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+}
+.status-pill.off {
+    background: rgba(100, 116, 139, 0.18);
+    color: #94a3b8;
+}
+
+.scheduler-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-row {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+[data-theme="light"] .task-row {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.task-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.task-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.task-icon { font-size: 18px; }
+
+.task-body {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.hour-select {
+    flex: 0 0 auto;
+    min-width: 130px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+[data-theme="light"] .hour-select {
+    background: rgba(255, 255, 255, 0.8);
+}
+.hour-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+}
+.hour-select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.task-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-wrap: wrap;
+    font-size: 13px;
+}
+
 
 .checkbox-label {
     display: flex;
@@ -493,6 +601,16 @@ body {
     gap: 16px;
 }
 
+/* 状态列表两列网格（用于高度较高的卡片） */
+.status-list.status-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.status-list.status-grid-2 .status-item.full {
+    grid-column: 1 / -1;
+}
+
 .status-item {
     display: flex;
     flex-direction: column;
@@ -557,6 +675,9 @@ body {
 .text-error {
     color: var(--color-error);
 }
+
+.text-muted { color: var(--text-muted); }
+.text-success { color: var(--color-success); }
 
 .text-warning {
     color: var(--color-warning, var(--color-error));
@@ -1358,7 +1479,7 @@ body {
     color: #e2e8f0;
     border-radius: 12px;
     padding: 16px;
-    height: 350px;
+    height: 500px;
     overflow-y: auto;
     font-family: 'Consolas', 'Fira Code', Courier, monospace;
     font-size: 13px;
@@ -2272,6 +2393,18 @@ body {
 .switch-toggle input:checked + .switch-slider:before {
     transform: translateX(20px);
     background-color: #fff;
+}
+
+/* 禁用态：滑块整体变灰、降低不透明度，视觉上明显不可用 */
+.switch-toggle input:disabled + .switch-slider {
+    background-color: rgba(100, 116, 139, 0.25) !important;
+    border-color: rgba(100, 116, 139, 0.4) !important;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.switch-toggle input:disabled:checked + .switch-slider {
+    background-color: rgba(100, 116, 139, 0.4) !important;
+    border-color: rgba(100, 116, 139, 0.5) !important;
 }
 
 

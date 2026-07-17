@@ -31,9 +31,6 @@
                 <a href="#" :class="['nav-item', { active: activeTab === 'epg' }]" @click.prevent="activeTab = 'epg'">
                     <span class="nav-icon">📅</span> EPG 节目管理
                 </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'log' }]" @click.prevent="activeTab = 'log'">
-                    <span class="nav-icon">📋</span> 系统日志
-                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -91,7 +88,62 @@
 
             <!-- 板块一：系统配置 -->
             <section v-if="activeTab === 'stb'" class="tab-pane">
-                <div class="card-grid">
+                <div class="card-grid cols-3">
+                    <!-- 定时同步设置 -->
+                    <div class="card form-card">
+                        <div class="card-header">
+                            <h3>定时自动同步管理</h3>
+                            <div class="scheduler-master">
+                                <span class="status-pill" :class="schedulerStatus.running ? 'on' : 'off'">
+                                    {{ schedulerStatus.running ? '运行中' : '已停止' }}
+                                </span>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" v-model="schedulerConfig.scheduler_enabled_bool" @change="saveSchedulerConfig">
+                                    <span class="switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="scheduler-tasks">
+                            <div class="task-row" v-for="task in schedulerTasks" :key="task.key">
+                                <div class="task-head">
+                                    <div class="task-title">
+                                        <span class="task-icon">{{ task.icon }}</span>
+                                        <span class="task-name">{{ task.name }} 同步时刻</span>
+                                    </div>
+                                    <label class="switch-toggle">
+                                        <input type="checkbox"
+                                               v-model="schedulerConfig[task.enabledKey]"
+                                               :disabled="!schedulerConfig.scheduler_enabled_bool"
+                                               @change="saveSchedulerConfig">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="task-body">
+                                    <select class="hour-select"
+                                            v-model.number="schedulerConfig[task.hourKey]"
+                                            :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig[task.enabledKey]"
+                                            @change="saveSchedulerConfig">
+                                        <option v-for="h in 24" :key="task.key+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
+                                    </select>
+                                    <div class="task-status">
+                                        <span :class="taskStatusClass(task.key)">{{ taskStatusText(task.key) }}</span>
+                                        <span class="text-muted" v-if="schedulerStatus.tasks[task.key]?.last_sync_time">
+                                            上次 {{ formatTime(schedulerStatus.tasks[task.key].last_sync_time) }}
+                                        </span>
+                                        <button class="btn btn-secondary btn-sm"
+                                                @click="manualSchedulerSync(task.key)"
+                                                :disabled="task.key === 'live' ? (syncingLive || !simStatus.is_authenticated)
+                                                         : task.key === 'epg'  ? epgSyncStatus.running
+                                                         : syncStatus.running">
+                                            🔄 手动同步
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="card form-card">
                         <div class="card-header">
                             <h3>机顶盒鉴权参数</h3>
@@ -135,7 +187,7 @@
                         <div class="card-header">
                             <h3>仿真鉴权运行状态</h3>
                         </div>
-                        <div class="status-list">
+                        <div class="status-list status-grid-2">
                             <div class="status-item">
                                 <span class="status-label">当前运行 IP</span>
                                 <span class="status-val highlight">{{ stbConfig.ip_address || resolvedIp || '未获取 (空值等待动态分配)' }}</span>
@@ -174,113 +226,40 @@
                                 </span>
                                 <span class="status-val text-muted" v-else>—</span>
                             </div>
-                            <div class="status-item">
+                            <div class="status-item full">
                                 <span class="status-label">说明</span>
                                 <p class="status-desc">机顶盒配置用于与电信 EPG 网关建立安全链路以获取点播播放 URL。建议直接保持 IP 地址为空，以允许程序根据宿主机当前连通 EPG 节点的路由状况自动生成正确的源 IP。</p>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- 定时同步设置 -->
-                    <div class="card form-card">
-                        <div class="card-header">
-                            <h3>定时同步设置</h3>
-                            <span class="badge">scheduler</span>
+                <!-- 系统运行日志 -->
+                <div class="card log-card" style="margin-top: 16px;">
+                    <div class="card-header">
+                        <div class="header-left">
+                            <h3>系统运行日志</h3>
                         </div>
-                        <div class="form-group inline-checkbox-group" style="margin-bottom: 14px;">
-                            <div class="switch-item">
-                                <label class="switch-toggle">
-                                    <input type="checkbox" v-model="schedulerConfig.scheduler_enabled_bool">
-                                    <span class="switch-slider"></span>
-                                </label>
-                                <span class="switch-label-text">⏰ 启用定时同步（总开关）</span>
-                            </div>
+                        <div class="log-actions">
+                            <select v-model="logLevelFilter" class="log-select">
+                                <option value="ALL">全部日志 (ALL)</option>
+                                <option value="DEBUG">调试 (DEBUG及以上)</option>
+                                <option value="INFO">信息 (INFO及以上)</option>
+                                <option value="WARNING">警告 (WARN及以上)</option>
+                                <option value="ERROR">错误 (ERROR及以上)</option>
+                            </select>
+                            <button class="btn btn-secondary btn-sm" @click="clearLogs">🗑️ 清空日志</button>
+                            <label class="auto-scroll-label">
+                                <input type="checkbox" v-model="logAutoScroll"> 自动滚动
+                            </label>
                         </div>
-                        <div class="scheduler-conditional" :style="{ opacity: schedulerConfig.scheduler_enabled_bool ? 1 : 0.45, pointerEvents: schedulerConfig.scheduler_enabled_bool ? 'auto' : 'none' }">
-                            <div class="form-grid scheduler-form-grid">
-                                <div class="form-group">
-                                    <label>直播同步时刻</label>
-                                    <select class="scheduler-select" v-model.number="schedulerConfig.live_sync_hour" :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig.live_sync_enabled_bool">
-                                        <option v-for="h in 24" :key="'live'+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>VOD 同步时刻</label>
-                                    <select class="scheduler-select" v-model.number="schedulerConfig.vod_sync_hour" :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig.vod_sync_enabled_bool">
-                                        <option v-for="h in 24" :key="'vod'+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>EPG 同步时刻</label>
-                                    <select class="scheduler-select" v-model.number="schedulerConfig.epg_sync_hour" :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig.epg_sync_enabled_bool">
-                                        <option v-for="h in 24" :key="'epg'+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-grid scheduler-form-grid" style="margin-top: 12px;">
-                                <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
-                                    <div class="switch-item">
-                                        <label class="switch-toggle">
-                                            <input type="checkbox" v-model="schedulerConfig.live_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
-                                            <span class="switch-slider"></span>
-                                        </label>
-                                        <span class="switch-label-text">📺 启用直播定时同步</span>
-                                    </div>
-                                </div>
-                                <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
-                                    <div class="switch-item">
-                                        <label class="switch-toggle">
-                                            <input type="checkbox" v-model="schedulerConfig.vod_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
-                                            <span class="switch-slider"></span>
-                                        </label>
-                                        <span class="switch-label-text">🎬 启用 VOD 定时同步</span>
-                                    </div>
-                                </div>
-                                <div class="form-group inline-checkbox-group" style="margin-bottom: 0;">
-                                    <div class="switch-item">
-                                        <label class="switch-toggle">
-                                            <input type="checkbox" v-model="schedulerConfig.epg_sync_enabled_bool" :disabled="!schedulerConfig.scheduler_enabled_bool">
-                                            <span class="switch-slider"></span>
-                                        </label>
-                                        <span class="switch-label-text">📅 启用 EPG 定时同步</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="status-desc" style="margin: 10px 0 0;">
-                            直播：进程已登录且当天未同步会立即顺带执行（不额外顶号）；若全天无登录，则到设定时刻强制登录兜底。注意：设为 0（午夜）时，因进程靠心跳常驻已登录，同步会在 00:00 触发；若希望“当天首次真实使用时”才同步，请把该值设为非 0 的小时（如 8）。
-                            VOD / EPG：免登录，仅打公共接口；当天尚未成功同步时，到达设定钟点触发补齐（重启不会重复触发），二者顺序执行（VOD 先，EPG 后），避免线程池叠加压服务器。
-                            任一任务失败每小时自动重试，当日超过上限后次日重置。
-                        </p>
-                        <div class="form-actions">
-                            <button class="btn btn-primary" @click="saveSchedulerConfig" :disabled="savingScheduler" style="width: 100%;">
-                                <span class="spinner" v-if="savingScheduler"></span>
-                                {{ savingScheduler ? '正在保存...' : '💾 保存定时设置' }}
-                            </button>
-                        </div>
-
-                        <div class="status-list" style="margin-top: 18px;">
-                            <div class="status-item">
-                                <span class="status-label">实际运行状态</span>
-                                <span :class="schedulerStatus.running ? 'status-val text-success' : 'status-val text-muted'">
-                                    {{ schedulerStatus.running ? '🟢 运行中' : '⭕ 已暂停' }}
-                                </span>
-                            </div>
-
-                            <div class="status-item" v-for="(t, name) in schedulerStatus.tasks" :key="name">
-                                <span class="status-label">{{ taskLabels[name] || name }}</span>
-                                <span class="status-val">
-                                    <template v-if="schedulerStatus.config && schedulerStatus.config[name + '_sync_enabled'] === false">
-                                        <span class="text-muted">⛔ 已禁用</span>
-                                    </template>
-                                    <template v-else>
-                                        <span :class="t.done_today ? 'text-success' : (t.gave_up ? 'text-error' : 'text-muted')">
-                                            {{ t.done_today ? '✅ 今日已同步' : (t.gave_up ? '❌ 今日放弃' : (t.retrying ? '🔁 待重试' : '⏳ 待执行')) }}
-                                        </span>
-                                        <span class="text-muted" style="margin-left: 8px;">上次 {{ formatTime(t.last_sync_time) }}</span>
-                                    </template>
-                                </span>
-                            </div>
+                    </div>
+                    <div class="log-container" ref="logContainer">
+                        <div v-if="filteredLogs.length === 0" class="log-empty">暂无相关运行日志</div>
+                        <div v-else v-for="(log, idx) in filteredLogs" :key="idx" :class="['log-item', log.level]">
+                            <span class="log-time">{{ log.time }}</span>
+                            <span :class="['log-level-text', log.level.toLowerCase()]">{{ log.level }}</span>
+                            <span class="log-message">{{ log.message }}</span>
                         </div>
                     </div>
                 </div>
@@ -632,39 +611,6 @@
                     <div class="live-ch-list" style="margin-top:10px;max-height:400px;overflow-y:auto;">
                         <div v-if="nowPlaying.length===0" style="padding:20px;text-align:center;color:var(--text-muted);">{{ nowPlayingLoaded?'无正在播放节目':'点击刷新' }}</div>
                         <div v-for="p in nowPlaying" :key="p.channel_id" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;font-size:14px;"><span><strong>{{ p.channel_name }}</strong><span style="color:var(--text-muted);margin-left:8px;">{{ p.title }}</span></span><span style="color:var(--text-muted);font-size:12px;">{{ p.start_time?.slice(11,16) }} - {{ p.end_time?.slice(11,16) }}</span></div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 板块三：系统日志 -->
-
-            <section v-if="activeTab === 'log'" class="tab-pane">
-                <div class="card log-card">
-                    <div class="card-header">
-                        <div class="header-left">
-                            <h3>系统运行日志</h3>
-                        </div>
-                        <div class="log-actions">
-                            <select v-model="logLevelFilter" class="log-select">
-                                <option value="ALL">全部日志 (ALL)</option>
-                                <option value="DEBUG">调试 (DEBUG及以上)</option>
-                                <option value="INFO">信息 (INFO及以上)</option>
-                                <option value="WARNING">警告 (WARN及以上)</option>
-                                <option value="ERROR">错误 (ERROR及以上)</option>
-                            </select>
-                            <button class="btn btn-secondary btn-sm" @click="clearLogs">🗑️ 清空日志</button>
-                            <label class="auto-scroll-label">
-                                <input type="checkbox" v-model="logAutoScroll"> 自动滚动
-                            </label>
-                        </div>
-                    </div>
-                    <div class="log-container" ref="logContainer">
-                        <div v-if="filteredLogs.length === 0" class="log-empty">暂无相关运行日志</div>
-                        <div v-else v-for="(log, idx) in filteredLogs" :key="idx" :class="['log-item', log.level]">
-                            <span class="log-time">{{ log.time }}</span>
-                            <span :class="['log-level-text', log.level.toLowerCase()]">{{ log.level }}</span>
-                            <span class="log-message">{{ log.message }}</span>
-                        </div>
                     </div>
                 </div>
             </section>
