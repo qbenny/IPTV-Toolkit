@@ -89,8 +89,10 @@ def apply_scheduler_enabled(enabled: bool):
     开启 -> start_scheduler 启动线程；关闭 -> stop_scheduler 线程退出。
     """
     if enabled:
+        logger.info("[Scheduler] 总开关已开启，调度器即将启动")
         start_scheduler(_sim, _login_func)
     else:
+        logger.info("[Scheduler] 总开关已关闭，调度器将停止（最多等待 60s）")
         stop_scheduler()
 
 
@@ -99,6 +101,15 @@ def save_scheduler_config(configs: dict):
 
     供 PUT /api/scheduler/config 调用。配置落在 scheduler_config。
     """
+    # 打印分开关变更日志，便于用户在 Web UI 操作时直观看到生效情况
+    for key, label in (
+        ("live_sync_enabled", "直播"),
+        ("vod_sync_enabled", "VOD"),
+        ("epg_sync_enabled", "EPG"),
+    ):
+        if key in configs:
+            on = str(configs[key]).strip().lower() in ("1", "true", "yes", "on", "y")
+            logger.info("[Scheduler] %s 定时同步已%s", label, "开启" if on else "禁用")
     cfg_bulk_set(configs, "scheduler_config")
     if "scheduler_enabled" in configs:
         enabled = str(configs["scheduler_enabled"]).strip().lower() in ("1", "true", "yes", "on", "y")
