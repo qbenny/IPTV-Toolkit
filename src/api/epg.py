@@ -15,17 +15,11 @@ from src.utils.logger import logger
 router = APIRouter(prefix="/api/epg", tags=["epg"])
 
 _simulator = None
-_login_func = None
 
 
 def set_simulator(sim):
     global _simulator
     _simulator = sim
-
-
-def set_login_func(func):
-    global _login_func
-    _login_func = func
 
 
 # ── 配置管理 ──────────────────────────────────────────
@@ -43,25 +37,13 @@ async def update_epg_config(new_configs: dict):
     return {"status": "success", "message": "EPG 配置已保存"}
 
 
-
-def _ensure_auth() -> bool:
-    """确保 STB 已认证，未认证则尝试登录。"""
-    if _simulator and not _simulator.state.is_authenticated:
-        if _login_func:
-            return _login_func()
-    return _simulator and _simulator.state.is_authenticated
-
-
 # ── 同步管理 ──────────────────────────────────────────
 
 @router.post("/sync")
 async def trigger_epg_sync():
-    """触发 EPG 数据同步（后台线程执行）。"""
+    """触发 EPG 数据同步（后台线程执行，免登录）。"""
     if not _simulator:
         return JSONResponse({"status": "error", "message": "模拟器未初始化"}, status_code=500)
-
-    if not _ensure_auth():
-        return JSONResponse({"status": "error", "message": "STB 未认证，请先配置凭证并登录"}, status_code=503)
 
     if epg_sync_status["running"]:
         return {"status": "already_running", "message": "EPG 同步已在运行中"}

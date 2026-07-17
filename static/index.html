@@ -314,12 +314,9 @@
                             </div>
                         </div>
                         <div class="form-actions" style="margin-top: 20px;">
-                            <button class="btn btn-primary" @click="triggerSync" :disabled="syncStatus.running || !simStatus.is_authenticated" style="width: 100%;">
+                            <button class="btn btn-primary" @click="triggerSync" :disabled="syncStatus.running" style="width: 100%;">
                                 {{ syncStatus.running ? '⏳ 同步中...' : '🔄 开始全量同步' }}
                             </button>
-                            <small v-if="!simStatus.is_authenticated" style="color: var(--text-muted); display: block; margin-top: 8px;">
-                                ⚠️ 请先在「系统配置」页面完成登录认证
-                            </small>
                         </div>
                     </div>
 
@@ -617,7 +614,7 @@
                             <div class="status-item" v-if="epgSyncStatus.last_sync_time"><span class="status-label">上次同步</span><span class="status-val">{{ formatTime(epgSyncStatus.last_sync_time) }}</span></div>
                         </div>
                         <div class="form-actions" style="margin-top:20px;">
-                            <button class="btn btn-primary" @click="triggerEpgSync" :disabled="epgSyncStatus.running||!simStatus.is_authenticated" style="width: 100%;">
+                            <button class="btn btn-primary" @click="triggerEpgSync" :disabled="epgSyncStatus.running" style="width: 100%;">
                                 {{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}
                             </button>
                         </div>
