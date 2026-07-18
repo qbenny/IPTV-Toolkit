@@ -96,7 +96,7 @@ const app = createApp({
             if (this.simStatusTimer) { clearInterval(this.simStatusTimer); this.simStatusTimer = null; }
         },
         async fetchSimStatus() {
-            try { this.simStatus = await stbService.getSimStatus(); } catch (e) {}
+            try { Object.assign(this.simStatus, await stbService.getSimStatus()); } catch (e) {}
         },
         startSimStatusPolling() {
             this.fetchSimStatus();
