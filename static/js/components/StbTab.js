@@ -20,7 +20,6 @@ const StbTab = {
         return {
             /* STB 配置 */
             stbConfig: { user_id: '', stb_id: '', mac_address: '', base_url: '', des_key: '', ip_address: '' },
-            resolvedIp: '',
             savingStb: false,
 
             /* 定时同步 */
@@ -312,7 +311,7 @@ const StbTab = {
                 <div class="status-list horizontal-stats">
                     <div class="status-item">
                         <span class="status-label">当前运行 IP</span>
-                        <span class="status-val highlight">{{ stbConfig.ip_address || resolvedIp || '未获取 (空值等待动态分配)' }}</span>
+                        <span class="status-val highlight">{{ simStatus.ip_address || stbConfig.ip_address || '未获取 (空值等待动态分配)' }}</span>
                     </div>
                     <div class="status-item">
                         <span class="status-label">IP 分配模式</span>
