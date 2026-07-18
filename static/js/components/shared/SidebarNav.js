@@ -27,13 +27,13 @@ const SidebarNav = {
                     <span class="nav-icon">⚙️</span> 系统配置
                 </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'vod' }]" @click.prevent="$emit('nav', 'vod')">
-                    <span class="nav-icon">🎬</span> VOD 点播管理
+                    <span class="nav-icon">🎬</span> VOD 点播
                 </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'live' }]" @click.prevent="$emit('nav', 'live')">
-                    <span class="nav-icon">📺</span> 直播频道管理
+                    <span class="nav-icon">📺</span> 直播频道
                 </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'epg' }]" @click.prevent="$emit('nav', 'epg')">
-                    <span class="nav-icon">📅</span> EPG 节目管理
+                    <span class="nav-icon">📅</span> EPG 节目
                 </a>
             </nav>
             <div class="sidebar-footer">

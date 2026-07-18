@@ -64,19 +64,19 @@ const EpgTab = {
                     <div class="status-item" v-if="epgSyncStatus.running"><span class="status-label">进度</span><span class="status-val highlight">{{ epgSyncStatus.progress }}</span></div>
                     <div class="status-item" v-if="epgSyncStatus.last_sync_time"><span class="status-label">上次同步</span><span class="status-val">{{ formatTime(epgSyncStatus.last_sync_time) }}</span></div>
                 </div>
-                <div class="form-actions mt-20"><button class="btn btn-primary w-full" @click="triggerEpgSync" :disabled="epgSyncStatus.running">{{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}</button></div>
+                <div class="form-actions mt-15"><button class="btn btn-primary w-full" @click="triggerEpgSync" :disabled="epgSyncStatus.running">{{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}</button></div>
             </div>
             <div class="card"><div class="card-header"><h3>EPG 统计</h3></div>
-                <div class="status-list mt-15">
+                <div class="status-list horizontal-stats mt-15">
                     <div class="status-item"><span class="status-label">节目总数</span><span class="status-val highlight">{{ epgStats.total_programs }}</span></div>
                     <div class="status-item"><span class="status-label">频道数</span><span class="status-val text-success">{{ epgStats.total_channels }}</span></div>
                     <div class="status-item"><span class="status-label">日期范围</span><span class="status-val">{{ epgStats.date_range?.earliest||'-' }} ~ {{ epgStats.date_range?.latest||'-' }}</span></div>
                 </div>
-                <p class="status-desc mt-16">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
+                <p class="status-desc mt-15">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
             </div>
         </div>
-        <div class="card mt-20"><div class="card-header"><h3>当前正在播放</h3><button class="btn btn-secondary btn-sm" @click="fetchNowPlaying">刷新</button></div>
-            <div class="live-ch-list mt-10" style="max-height:400px;overflow-y:auto;">
+        <div class="card"><div class="card-header"><h3>当前正在播放</h3><button class="btn btn-secondary btn-sm" @click="fetchNowPlaying">刷新</button></div>
+            <div class="live-ch-list mt-15" style="max-height:400px;overflow-y:auto;">
                 <div v-if="nowPlaying.length===0" class="empty-state">{{ nowPlayingLoaded?'无正在播放节目':'点击刷新' }}</div>
                 <div v-for="p in nowPlaying" :key="p.channel_id" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;font-size:14px;"><span><strong>{{ p.channel_name }}</strong><span style="color:var(--text-muted);margin-left:8px;">{{ p.title }}</span></span><span style="color:var(--text-muted);font-size:12px;">{{ p.start_time?.slice(11,16) }} - {{ p.end_time?.slice(11,16) }}</span></div>
             </div>

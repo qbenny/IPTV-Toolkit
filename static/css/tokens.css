@@ -10,6 +10,7 @@
 
 /* 深色主题 */
 [data-theme="dark"] {
+    /* 页面框架 */
     --bg-app: #090d16;
     --bg-sidebar: #0f1524;
     --bg-card: rgba(22, 30, 49, 0.7);
@@ -17,40 +18,86 @@
     --border-color: rgba(255, 255, 255, 0.08);
     --border-hover: rgba(255, 255, 255, 0.15);
 
+    /* 文字 */
     --text-main: #f1f5f9;
     --text-muted: #94a3b8;
     --text-inverse: #090d16;
 
+    /* 品牌色 */
     --color-primary: #6366f1;
     --color-primary-hover: #4f46e5;
     --color-primary-rgb: 99, 102, 241;
     --color-secondary: #0ea5e9;
     --color-secondary-hover: #0284c7;
 
+    /* 语义色 */
     --color-success: #10b981;
     --color-success-bg: rgba(16, 185, 129, 0.1);
     --color-warning: #f59e0b;
     --color-error: #ef4444;
     --color-error-bg: rgba(239, 68, 68, 0.1);
 
+    /* 阴影 */
     --shadow-main: 0 10px 30px rgba(0, 0, 0, 0.5);
     --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 
+    /* 滚动条 */
     --scroll-track: #0f1524;
     --scroll-thumb: #1e293b;
     --scroll-thumb-hover: #334155;
 
+    /* 控件背景 */
+    --bg-input: rgba(0, 0, 0, 0.2);
+    --bg-input-dim: rgba(0, 0, 0, 0.1);
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --ring-focus: rgba(var(--color-primary-rgb), 0.15);
     --glass-blur: 16px;
 
-    /* 控件背景 */
-    --bg-input: rgba(0, 0, 0, 0.2);       /* select / textarea / 搜索框 */
-    --bg-input-dim: rgba(0, 0, 0, 0.1);    /* form-group 纯文本输入框 */
-    --bg-hover: rgba(255, 255, 255, 0.05);  /* 行悬浮 / 面板微提亮 */
-    --ring-focus: rgba(var(--color-primary-rgb), 0.15);
+    /* ── 组件级背景 ── */
+    --subtle-bg: rgba(255, 255, 255, 0.02);         /* 极淡行条：task-row / live-row-hover */
+    --panel-raised-bg: var(--bg-hover);              /* 微提亮面板：status-item */
+    --epg-date-nav-bg: rgba(0, 0, 0, 0.15);
+    --epg-program-list-bg: var(--bg-input);
+    --epg-prog-row-hover-bg: var(--bg-hover);
+    --epg-playing-bg: rgba(16, 185, 129, 0.08);
+    --epg-playing-border: #10b981;
+    --epg-badge-bg: rgba(16, 185, 129, 0.15);
+    --epg-badge-color: #10b981;
+    --epg-badge-border: rgba(16, 185, 129, 0.3);
+
+    /* ── 开关 Toggle ── */
+    --switch-track-bg: rgba(255, 255, 255, 0.08);
+    --switch-disabled-bg: rgba(100, 116, 139, 0.25);
+    --switch-disabled-border: rgba(100, 116, 139, 0.4);
+    --switch-disabled-checked-bg: rgba(100, 116, 139, 0.4);
+    --switch-disabled-checked-border: rgba(100, 116, 139, 0.5);
+
+    /* ── 按钮 Spinner ── */
+    --btn-spinner-border: rgba(255, 255, 255, 0.3);
+    --btn-spinner-top: white;
+
+    /* ── 日志控制台 ── */
+    --log-bg: #0f172a;
+    --log-text: #e2e8f0;
+    --log-scroll-track: #0f1724;
+    --log-scroll-thumb: #334155;
+    --log-scroll-thumb-hover: #475569;
+    --log-empty-color: #64748b;
+    --log-time-color: #64748b;
+    --log-debug-text: #64748b;
+    --log-info-text: #3b82f6;
+    --log-warning-text: #f59e0b;
+    --log-error-text: #ef4444;
+    --log-item-hover-bg: rgba(255, 255, 255, 0.05);
+    --log-item-error-bg: rgba(239, 68, 68, 0.05);
+    --log-item-error-border: #ef4444;
+    --log-item-warning-bg: rgba(245, 158, 11, 0.03);
+    --log-item-warning-border: #f59e0b;
 }
 
 /* 浅色主题 */
 [data-theme="light"] {
+    /* 页面框架 */
     --bg-app: #f1f5f9;
     --bg-sidebar: #ffffff;
     --bg-card: rgba(255, 255, 255, 0.85);
@@ -58,34 +105,78 @@
     --border-color: rgba(0, 0, 0, 0.08);
     --border-hover: rgba(0, 0, 0, 0.15);
 
+    /* 文字 */
     --text-main: #0f172a;
     --text-muted: #64748b;
     --text-inverse: #ffffff;
 
+    /* 品牌色 */
     --color-primary: #4f46e5;
     --color-primary-hover: #3730a3;
     --color-primary-rgb: 79, 70, 229;
     --color-secondary: #0284c7;
     --color-secondary-hover: #0369a1;
 
+    /* 语义色 */
     --color-success: #059669;
     --color-success-bg: rgba(5, 150, 105, 0.1);
     --color-warning: #d97706;
     --color-error: #dc2626;
     --color-error-bg: rgba(220, 38, 38, 0.1);
 
+    /* 阴影 */
     --shadow-main: 0 10px 25px rgba(15, 23, 42, 0.06);
     --shadow-inset: inset 0 2px 4px rgba(15, 23, 42, 0.05);
 
+    /* 滚动条 */
     --scroll-track: #f1f5f9;
     --scroll-thumb: #cbd5e1;
     --scroll-thumb-hover: #94a3b8;
 
-    --glass-blur: 16px;
-
-    /* 控件背景（浅色即白色半透明） */
+    /* 控件背景 */
     --bg-input: rgba(255, 255, 255, 0.8);
     --bg-input-dim: rgba(255, 255, 255, 0.8);
     --bg-hover: rgba(0, 0, 0, 0.05);
     --ring-focus: rgba(var(--color-primary-rgb), 0.15);
+    --glass-blur: 16px;
+
+    /* ── 组件级背景 ── */
+    --subtle-bg: rgba(0, 0, 0, 0.02);               /* 极淡行条 */
+    --panel-raised-bg: rgba(255, 255, 255, 0.4);     /* 微提亮面板：status-item */
+    --epg-date-nav-bg: rgba(0, 0, 0, 0.03);
+    --epg-program-list-bg: rgba(0, 0, 0, 0.025);
+    --epg-prog-row-hover-bg: rgba(0, 0, 0, 0.03);
+    --epg-playing-bg: rgba(5, 150, 105, 0.08);
+    --epg-playing-border: #059669;
+    --epg-badge-bg: rgba(5, 150, 105, 0.15);
+    --epg-badge-color: #059669;
+    --epg-badge-border: rgba(5, 150, 105, 0.3);
+
+    /* ── 开关 Toggle ── */
+    --switch-track-bg: rgba(0, 0, 0, 0.05);
+    --switch-disabled-bg: rgba(100, 116, 139, 0.25);
+    --switch-disabled-border: rgba(100, 116, 139, 0.4);
+    --switch-disabled-checked-border: rgba(100, 116, 139, 0.5);
+
+    /* ── 按钮 Spinner ── */
+    --btn-spinner-border: rgba(0, 0, 0, 0.1);
+    --btn-spinner-top: var(--text-main);
+
+    /* ── 日志控制台 ── */
+    --log-bg: #f8fafc;
+    --log-text: #1e293b;
+    --log-scroll-track: #f1f5f9;
+    --log-scroll-thumb: #cbd5e1;
+    --log-scroll-thumb-hover: #94a3b8;
+    --log-empty-color: #94a3b8;
+    --log-time-color: #94a3b8;
+    --log-debug-text: #94a3b8;
+    --log-info-text: #4f46e5;
+    --log-warning-text: #d97706;
+    --log-error-text: #dc2626;
+    --log-item-hover-bg: rgba(0, 0, 0, 0.03);
+    --log-item-error-bg: rgba(220, 38, 38, 0.02);
+    --log-item-error-border: #dc2626;
+    --log-item-warning-bg: rgba(217, 119, 6, 0.01);
+    --log-item-warning-border: #d97706;
 }

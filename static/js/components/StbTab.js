@@ -331,7 +331,7 @@ const StbTab = {
                 <div class="card-header">
                     <h3>仿真鉴权运行状态</h3>
                 </div>
-                <div class="status-list status-grid-2">
+                <div class="status-list horizontal-stats">
                     <div class="status-item">
                         <span class="status-label">当前运行 IP</span>
                         <span class="status-val highlight">{{ stbConfig.ip_address || resolvedIp || '未获取 (空值等待动态分配)' }}</span>
@@ -378,7 +378,7 @@ const StbTab = {
             </div>
         </div>
 
-        <div class="card log-card mt-16">
+        <div class="card log-card">
             <div class="card-header">
                 <div class="header-left">
                     <h3>系统运行日志</h3>
