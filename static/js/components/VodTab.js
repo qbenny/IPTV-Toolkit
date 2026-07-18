@@ -23,6 +23,7 @@ const VodTab = {
         this.fetchSyncStatus();
         this.fetchDbStats();
         this.fetchVodConfig();
+        if (!this.syncStatusTimer) this.syncStatusTimer = setInterval(() => this.fetchSyncStatus(), 10000);
     },
 
     beforeUnmount() {
@@ -33,8 +34,8 @@ const VodTab = {
         async triggerSync() {
             try {
                 const res = await vodService.triggerSync();
-                if (res.status === 'started') { this.showToast('同步已启动'); this.startSyncStatusPolling(); }
-                else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.startSyncStatusPolling(); }
+                if (res.status === 'started') { this.showToast('同步已启动'); this.fetchSyncStatus(); }
+                else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.fetchSyncStatus(); }
                 else this.showToast(res.message || '启动失败', 'error');
             } catch (e) { this.showToast(e.message || '通信异常', 'error'); }
         },
@@ -51,10 +52,6 @@ const VodTab = {
             } catch (e) { /* silent */ }
         },
         async fetchDbStats() { try { this.dbStats = await vodService.getDbStats(); } catch (e) {} },
-        startSyncStatusPolling() {
-            this.fetchSyncStatus(); this.fetchDbStats();
-            if (!this.syncStatusTimer) this.syncStatusTimer = setInterval(() => this.fetchSyncStatus(), 2000);
-        },
         async fetchVodConfig() {
             try {
                 const config = await vodService.getVodConfig();

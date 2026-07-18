@@ -445,11 +445,11 @@ const LiveTab = {
                         <div class="form-actions mt-15"><button class="btn btn-primary w-full" @click="importExternalChannels" :disabled="importingChannels"><span class="spinner" v-if="importingChannels"></span>{{ importingChannels ? '导入中...' : '📥 开始导入' }}</button></div>
                     </div>
                     <div class="import-area">
-                        <div v-if="importMethod === 'text'" class="w-full"><textarea v-model="importText" placeholder="在此粘贴 M3U 订阅链接或 M3U 文本内容..." rows="4" class="import-textarea"></textarea></div>
+                        <div v-if="importMethod === 'text'" class="w-full"><textarea id="import-text" name="m3u_text" v-model="importText" placeholder="在此粘贴 M3U 订阅链接或 M3U 文本内容..." rows="4" class="import-textarea"></textarea></div>
                         <div v-else class="w-full">
                             <div class="file-upload-zone" @dragover.prevent @drop.prevent="handleImportFileDrop">
                                 <span class="upload-icon">📥</span>
-                                <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label">选择文件<input type="file" @change="handleImportFileSelect" accept=".m3u,.m3u8" class="hidden"></label></p>
+                                <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label" for="import-file">选择文件</label><input type="file" id="import-file" name="m3u_file" @change="handleImportFileSelect" accept=".m3u,.m3u8" class="hidden"></p>
                                 <p v-else class="text-success text-xs">已选择文件: <strong>{{ importFile.name }}</strong> <button class="btn-clear" @click="importFile = null">[清除]</button></p>
                             </div>
                         </div>
@@ -468,10 +468,10 @@ const LiveTab = {
         </div>
         <div class="live-toolbar">
             <div class="toolbar-left">
-                <div class="filter-group"><select v-model="liveFilter.category_id" @change="fetchLiveChannels(1)"><option :value="null">全部分类</option><option :value="0">未分类</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></div>
-                <div class="filter-group"><select v-model="liveFilter.enabled" @change="fetchLiveChannels(1)"><option :value="null">全部状态</option><option :value="1">仅启用</option><option :value="0">仅禁用</option></select></div>
-                <div class="filter-group"><select v-model="liveFilter.source" @change="fetchLiveChannels(1)"><option :value="null">全部来源</option><option value="server">服务器下发</option><option value="external">外部导入</option></select></div>
-                <div class="filter-group search-group"><input type="text" v-model="liveFilter.keyword" placeholder="搜索频道名 / ID / 序号" @keyup.enter="fetchLiveChannels(1)"><button class="btn btn-secondary btn-sm" @click="fetchLiveChannels(1)">🔍</button></div>
+                <div class="filter-group"><select name="filter_category" v-model="liveFilter.category_id" @change="fetchLiveChannels(1)"><option :value="null">全部分类</option><option :value="0">未分类</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></div>
+                <div class="filter-group"><select name="filter_enabled" v-model="liveFilter.enabled" @change="fetchLiveChannels(1)"><option :value="null">全部状态</option><option :value="1">仅启用</option><option :value="0">仅禁用</option></select></div>
+                <div class="filter-group"><select name="filter_source" v-model="liveFilter.source" @change="fetchLiveChannels(1)"><option :value="null">全部来源</option><option value="server">服务器下发</option><option value="external">外部导入</option></select></div>
+                <div class="filter-group search-group"><input type="text" id="live-search" name="keyword" v-model="liveFilter.keyword" placeholder="搜索频道名 / ID / 序号" @keyup.enter="fetchLiveChannels(1)"><button class="btn btn-secondary btn-sm" @click="fetchLiveChannels(1)">🔍</button></div>
             </div>
             <div class="toolbar-right">
                 <button class="btn btn-secondary" @click="openCategoryModal">📂 分类管理</button>
@@ -490,24 +490,24 @@ const LiveTab = {
                     <div class="batch-buttons">
                         <button class="btn btn-secondary btn-sm" @click="batchSetEnabled(1)">🟢 批量启用</button>
                         <button class="btn btn-secondary btn-sm" @click="batchSetEnabled(0)">🔴 批量禁用</button>
-                        <select class="batch-cat-select" @change="batchChangeCategory($event)"><option value="" disabled selected>📂 批量修改分类...</option><option value="0">其他 (未分类)</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select>
+                        <select name="batch_category" class="batch-cat-select" @change="batchChangeCategory($event)"><option value="" disabled selected>📂 批量修改分类...</option><option value="0">其他 (未分类)</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select>
                         <button class="btn btn-danger btn-sm" @click="batchDelete" :disabled="!canBatchDelete">🗑️ 批量删除</button>
                     </div>
                 </div>
                 <div class="table-container"><table class="live-table"><thead><tr>
-                    <th class="cell-sm"><input type="checkbox" v-model="selectAllChannels" @change="toggleSelectAll"></th><th class="cell-sm">启用</th><th class="cell-sm">排序</th><th style="width: 100px;">序号 / ID</th><th class="cell-sm">台标</th><th style="width: 150px;">原名</th><th style="width: 200px;">别名</th><th style="width: 90px;">所属分类</th><th>组播地址</th><th>单播地址</th><th style="width: 120px; text-align: center;">操作</th>
+                    <th class="cell-sm"><input type="checkbox" id="select-all" name="select_all" v-model="selectAllChannels" @change="toggleSelectAll"></th><th class="cell-sm">启用</th><th class="cell-sm">排序</th><th style="width: 100px;">序号 / ID</th><th class="cell-sm">台标</th><th style="width: 150px;">原名</th><th style="width: 200px;">别名</th><th style="width: 90px;">所属分类</th><th>组播地址</th><th>单播地址</th><th style="width: 120px; text-align: center;">操作</th>
                 </tr></thead>
                 <tbody id="live-channel-list-tbody" :key="tbodyKey">
                     <tr v-if="liveChannels.length === 0"><td colspan="11" class="empty-row" style="text-align: center; padding: 30px; color: var(--text-muted);">暂无满足条件的频道数据，请尝试同步或手动导入</td></tr>
                     <tr v-for="ch in liveChannels" :key="ch.id" :data-id="ch.id" class="live-channel-row">
-                        <td style="text-align: center;"><input type="checkbox" :value="ch.id" v-model="selectedChannelIds"></td>
-                        <td style="text-align: center;"><label class="switch-toggle"><input type="checkbox" :checked="ch.is_enabled === 1" @change="toggleChannelEnabled(ch)"><span class="switch-slider"></span></label></td>
+                        <td style="text-align: center;"><input type="checkbox" :name="'ch_select_' + ch.id" :value="ch.id" v-model="selectedChannelIds"></td>
+                        <td style="text-align: center;"><label class="switch-toggle"><input type="checkbox" :name="'ch_enabled_' + ch.id" :checked="ch.is_enabled === 1" @change="toggleChannelEnabled(ch)"><span class="switch-slider"></span></label></td>
                         <td style="text-align: center;" class="drag-handle"><span style="cursor: move; color: var(--text-muted); font-size: 16px;">☰</span></td>
                         <td style="white-space: nowrap;"><span class="text-secondary" style="font-weight: 600;" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span><span class="text-muted" style="font-size: 11px; margin-left: 8px;" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span></td>
                         <td style="text-align: center; padding: 4px;"><img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.05); padding: 2px; border: 1px solid var(--border-color);" @error="handleLogoError(ch)"><span v-else style="color: var(--text-muted); font-size: 14px;">📺</span></td>
                         <td style="white-space: nowrap;"><span class="channel-name-cell clickable" :title="'点击添加别名映射: ' + ch.name" @click="quickAddAlias(ch.name)">{{ ch.name }}</span></td>
                         <td style="white-space: nowrap;"><span class="channel-name-cell">{{ ch.display_name || ch.name }}</span><span v-if="ch.source === 'external'" class="channel-tag" style="background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); border-color: rgba(var(--color-primary-rgb), 0.2);">外部</span><span v-if="ch.timeshift_enabled === 1" class="channel-tag" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.2);" :title="'支持时移回看，回看时长共 ' + (ch.back_time || 0) + ' 天'">回看: {{ ch.back_time || 0 }}天</span><span v-if="ch.epg_days && ch.epg_days > 0" class="channel-tag" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2); font-weight: 600; cursor: pointer;" :title="'点击预览 EPG 节目单 (当前共 ' + ch.epg_days + ' 天)'" @click="openEpgPreview(ch)">EPG: {{ ch.epg_days }}天</span><span v-else class="channel-tag" style="background: rgba(100, 116, 139, 0.1); color: #64748b; border-color: rgba(100, 116, 139, 0.2); opacity: 0.7;" title="暂无可用 EPG 数据">无EPG</span></td>
-                        <td><select class="cat-select" v-model="ch.category_id" @change="changeChannelCategory(ch)" :style="{ borderLeft: '4px solid ' + (ch.category_color || 'var(--border-color)'), background: ch.category_color ? ch.category_color + '18' : '' }"><option :value="0">未分类</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></td>
+                        <td><select :name="'ch_cat_' + ch.id" class="cat-select" v-model="ch.category_id" @change="changeChannelCategory(ch)" :style="{ borderLeft: '4px solid ' + (ch.category_color || 'var(--border-color)'), background: ch.category_color ? ch.category_color + '18' : '' }"><option :value="0">未分类</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></td>
                         <td class="url-cell" :title="ch.multicast_url"><code class="url-text">{{ ch.multicast_url || '—' }}</code></td>
                         <td class="url-cell" :title="ch.unicast_url"><code class="url-text">{{ ch.unicast_url || '—' }}</code></td>
                         <td style="text-align: center;"><div class="row-actions justify-center"><button v-if="ch.source === 'external'" class="btn-text btn-text-danger" @click="deleteChannel(ch.id)" title="删除外部频道">🗑️</button></div></td>
@@ -610,13 +610,13 @@ const LiveTab = {
                             <small class="form-help text-muted">开启后，同一频道将同时生成 udpxy 组播和 RTSP 单播两行数据。</small>
                         </div>
                         <div class="form-group" style="margin-bottom: 15px; transition: opacity 0.2s;" :style="{ opacity: liveConfig.udpxy_enabled_bool ? 1 : 0.5, pointerEvents: liveConfig.udpxy_enabled_bool ? 'auto' : 'none' }">
-                            <label>udpxy 代理服务地址</label>
-                            <input type="text" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688" :disabled="!liveConfig.udpxy_enabled_bool">
+                            <label for="live-udpxy">udpxy 代理服务地址</label>
+                            <input type="text" id="live-udpxy" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688" :disabled="!liveConfig.udpxy_enabled_bool">
                             <small class="form-help">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
                         </div>
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label>LOGO 基础 URL</label>
-                            <input type="text" v-model="liveConfig.logo_base_url" placeholder="默认为 /static/logo/">
+                            <label for="live-logo-url">LOGO 基础 URL</label>
+                            <input type="text" id="live-logo-url" v-model="liveConfig.logo_base_url" placeholder="默认为 /static/logo/">
                             <small class="form-help">用于拼接频道台标地址。若是相对路径，生成 M3U 时会自动拼接当前的网卡 Host 头部。</small>
                         </div>
                     </div>
@@ -708,7 +708,7 @@ const LiveTab = {
                         </div>
                         <div class="form-group">
                             <label>所属分类</label>
-                            <select v-model="editingCh.category_id">
+                            <select name="edit_category" v-model="editingCh.category_id">
                                 <option :value="0">未分类</option>
                                 <option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                             </select>
@@ -795,7 +795,7 @@ const LiveTab = {
         </transition>
 
         <!-- 文件导入 input -->
-        <input type="file" ref="aliasFileInput" accept=".json" @change="handleAliasFileImport" class="hidden">
-        <input type="file" ref="categoryMappingFileInput" accept=".json" @change="handleCategoryMappingFileImport" class="hidden">
+        <input type="file" id="import-aliases" name="aliases_file" ref="aliasFileInput" accept=".json" @change="handleAliasFileImport" class="hidden">
+        <input type="file" id="import-category-mapping" name="category_mapping_file" ref="categoryMappingFileInput" accept=".json" @change="handleCategoryMappingFileImport" class="hidden">
     `
 };

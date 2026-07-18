@@ -245,7 +245,7 @@ const StbTab = {
                             {{ schedulerStatus.running ? '运行中' : '已停止' }}
                         </span>
                         <label class="switch-toggle">
-                            <input type="checkbox" v-model="schedulerConfig.scheduler_enabled_bool" @change="saveSchedulerConfig">
+                            <input type="checkbox" id="scheduler-master" name="scheduler_enabled" v-model="schedulerConfig.scheduler_enabled_bool" @change="saveSchedulerConfig">
                             <span class="switch-slider"></span>
                         </label>
                     </div>
@@ -258,7 +258,7 @@ const StbTab = {
                                 <span class="task-name">{{ task.name }} 同步时刻</span>
                             </div>
                             <label class="switch-toggle">
-                                <input type="checkbox"
+                                <input type="checkbox" :name="task.key + '_enabled'"
                                        v-model="schedulerConfig[task.enabledKey]"
                                        :disabled="!schedulerConfig.scheduler_enabled_bool"
                                        @change="saveSchedulerConfig">
@@ -266,7 +266,7 @@ const StbTab = {
                             </label>
                         </div>
                         <div class="task-body">
-                            <select class="hour-select"
+                            <select class="hour-select" :id="task.key + '-hour'" :name="task.key + '_hour'"
                                     v-model.number="schedulerConfig[task.hourKey]"
                                     :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig[task.enabledKey]"
                                     @change="saveSchedulerConfig">
@@ -295,28 +295,28 @@ const StbTab = {
                 </div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>业务账号 (User ID)</label>
-                        <input type="text" v-model="stbConfig.user_id" placeholder="例如: 1234567890123456">
+                        <label for="stb-user-id">业务账号 (User ID)</label>
+                        <input type="text" id="stb-user-id" v-model="stbConfig.user_id" placeholder="例如: 1234567890123456">
                     </div>
                     <div class="form-group">
-                        <label>终端设备 ID (STBID)</label>
-                        <input type="text" v-model="stbConfig.stb_id" placeholder="例如: 001003990060262001123456789ABCDE">
+                        <label for="stb-device-id">终端设备 ID (STBID)</label>
+                        <input type="text" id="stb-device-id" v-model="stbConfig.stb_id" placeholder="例如: 001003990060262001123456789ABCDE">
                     </div>
                     <div class="form-group">
-                        <label>物理 MAC 地址</label>
-                        <input type="text" v-model="stbConfig.mac_address" placeholder="例如: A0:B1:C2:D3:E4:F5">
+                        <label for="stb-mac">物理 MAC 地址</label>
+                        <input type="text" id="stb-mac" v-model="stbConfig.mac_address" placeholder="例如: A0:B1:C2:D3:E4:F5">
                     </div>
                     <div class="form-group">
-                        <label>EPG 网关基础 URL</label>
-                        <input type="text" v-model="stbConfig.base_url" placeholder="例如: http://10.123.123.123:33200">
+                        <label for="stb-base-url">EPG 网关基础 URL</label>
+                        <input type="text" id="stb-base-url" v-model="stbConfig.base_url" placeholder="例如: http://10.123.123.123:33200">
                     </div>
                     <div class="form-group">
-                        <label>动态算密 Key (DES Key)</label>
-                        <input type="text" v-model="stbConfig.des_key" placeholder="默认为 00000000">
+                        <label for="stb-des-key">动态算密 Key (DES Key)</label>
+                        <input type="text" id="stb-des-key" v-model="stbConfig.des_key" placeholder="默认为 00000000">
                     </div>
                     <div class="form-group">
-                        <label>网卡出网 IP 地址 (留空开启动态探测)</label>
-                        <input type="text" v-model="stbConfig.ip_address" placeholder="空值将利用路由表自动探测绑定">
+                        <label for="stb-ip">网卡出网 IP 地址 (留空开启动态探测)</label>
+                        <input type="text" id="stb-ip" v-model="stbConfig.ip_address" placeholder="空值将利用路由表自动探测绑定">
                     </div>
                 </div>
                 <div class="form-actions">
@@ -384,7 +384,7 @@ const StbTab = {
                     <h3>系统运行日志</h3>
                 </div>
                 <div class="log-actions">
-                    <select v-model="logLevelFilter">
+                    <select id="log-level" name="log_level" v-model="logLevelFilter">
                         <option value="ALL">全部日志 (ALL)</option>
                         <option value="DEBUG">调试 (DEBUG及以上)</option>
                         <option value="INFO">信息 (INFO及以上)</option>
@@ -393,7 +393,7 @@ const StbTab = {
                     </select>
                     <button class="btn btn-secondary btn-sm" @click="clearLogs">🗑️ 清空日志</button>
                     <label class="auto-scroll-label">
-                        <input type="checkbox" v-model="logAutoScroll"> 自动滚动
+                        <input type="checkbox" id="log-auto-scroll" name="auto_scroll" v-model="logAutoScroll"> <label for="log-auto-scroll">自动滚动</label>
                     </label>
                 </div>
             </div>

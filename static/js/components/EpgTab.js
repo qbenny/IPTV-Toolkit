@@ -21,6 +21,7 @@ const EpgTab = {
     created() {
         this.fetchEpgSyncStatus();
         this.fetchEpgStats();
+        if (!this.epgSyncTimer) this.epgSyncTimer = setInterval(() => this.fetchEpgSyncStatus(), 10000);
     },
 
     beforeUnmount() {
@@ -31,28 +32,21 @@ const EpgTab = {
         async triggerEpgSync() {
             try {
                 const res = await epgService.triggerSync();
-                if (res.status === 'started') { this.showToast('EPG 同步已启动'); this.startEpgSyncPolling(); }
-                else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.startEpgSyncPolling(); }
+                if (res.status === 'started') { this.showToast('EPG 同步已启动'); this.fetchEpgSyncStatus(); }
+                else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.fetchEpgSyncStatus(); }
                 else this.showToast(res.message || '启动失败', 'error');
             } catch (e) { this.showToast(e.message || '通信异常', 'error'); }
         },
         async fetchEpgSyncStatus() {
             try {
+                const prevRunning = this.epgSyncStatus.running;
                 this.epgSyncStatus = await epgService.getSyncStatus();
-                if (!this.epgSyncStatus.running && this.epgSyncTimer) {
-                    clearInterval(this.epgSyncTimer); this.epgSyncTimer = null;
-                    if (this.previousEpgRunning && this.epgSyncStatus.last_sync_time) {
-                        this.showToast('EPG 同步完成!'); this.fetchEpgStats();
-                    }
+                if (prevRunning && !this.epgSyncStatus.running && this.epgSyncStatus.last_sync_time) {
+                    this.showToast('EPG 同步完成!'); this.fetchEpgStats();
                 }
-                this.previousEpgRunning = this.epgSyncStatus.running;
             } catch (e) {}
         },
         async fetchEpgStats() { try { this.epgStats = await epgService.getStats(); } catch (e) {} },
-        startEpgSyncPolling() {
-            this.fetchEpgSyncStatus(); this.fetchEpgStats();
-            if (!this.epgSyncTimer) this.epgSyncTimer = setInterval(() => this.fetchEpgSyncStatus(), 2000);
-        },
         async fetchNowPlaying() { try { const data = await epgService.getNowPlaying(); this.nowPlaying = data.items || []; this.nowPlayingLoaded = true; } catch (e) {} }
     },
 
