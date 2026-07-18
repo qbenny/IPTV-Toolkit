@@ -266,17 +266,9 @@ const app = createApp({
             const channelId = this.epgPreviewChannel.tvg_id || this.epgPreviewChannel.channel_id || this.epgPreviewChannel.name;
             
             try {
-                const url = `/api/epg/programs?channel_id=${encodeURIComponent(channelId)}&date=${dateStr}&limit=200`;
-                const r = await fetch(url);
-                if (r.ok) {
-                    const data = await r.json();
-                    this.epgPrograms = data.items || [];
-                    
-                    // Auto scroll to playing program after DOM updates
-                    this.$nextTick(() => {
-                        this.scrollToPlayingProgram();
-                    });
-                }
+                const data = await epgService.getPrograms(channelId, dateStr);
+                this.epgPrograms = data.items || [];
+                this.$nextTick(() => { this.scrollToPlayingProgram(); });
             } catch (e) {
                 console.error("加载节目单失败:", e);
             } finally {
@@ -402,19 +394,15 @@ const app = createApp({
         // ---- STB Config ----
         async fetchStbConfig() {
             try {
-                const r = await fetch('/api/stb-config');
-                this.stbConfig = await r.json();
+                this.stbConfig = await stbService.getStbConfig();
             } catch (e) { /* silent */ }
         },
 
         async fetchSimStatus() {
             try {
-                const r = await fetch('/api/sim-status');
-                if (r.ok) {
-                    const d = await r.json();
-                    this.simStatus = d;
-                    if (d.ip_address) this.resolvedIp = d.ip_address;
-                }
+                const d = await stbService.getSimStatus();
+                this.simStatus = d;
+                if (d.ip_address) this.resolvedIp = d.ip_address;
             } catch (e) { /* silent */ }
         },
 
@@ -457,54 +445,40 @@ const app = createApp({
         async saveStbConfig() {
             this.savingStb = true;
             try {
-                const r = await fetch('/api/stb-config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.stbConfig)
-                });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(res.message, res.status === 'warning' ? 'error' : 'success');
-                    await this.fetchStbConfig();
-                } else {
-                    this.showToast(res.message || '保存失败', 'error');
-                }
+                const res = await stbService.saveStbConfig(this.stbConfig);
+                this.showToast(res.message, res.status === 'warning' ? 'error' : 'success');
+                await this.fetchStbConfig();
             } catch (e) {
-                this.showToast('通信异常', 'error');
+                this.showToast(e.message || '通信异常', 'error');
             } finally { this.savingStb = false; }
         },
 
         // ---- 定时同步设置（钟点存于 live_config，状态来自调度器）----
         async fetchSchedulerConfig() {
             try {
-                const r = await fetch('/api/scheduler/config');
-                const c = await r.json();
+                const c = await stbService.getSchedulerConfig();
                 this.schedulerConfig = {
                     live_sync_hour: parseInt(c.live_sync_hour ?? 0) || 0,
                     vod_sync_hour: parseInt(c.vod_sync_hour ?? 1) || 0,
                     epg_sync_hour: parseInt(c.epg_sync_hour ?? 1) || 0,
-                    scheduler_enabled_bool: c.scheduler_enabled !== '0',   // 默认开启
-                    live_sync_enabled_bool: c.live_sync_enabled !== '0',  // 默认开启
-                    vod_sync_enabled_bool: c.vod_sync_enabled !== '0',    // 默认开启
-                    epg_sync_enabled_bool: c.epg_sync_enabled !== '0'     // 默认开启
+                    scheduler_enabled_bool: c.scheduler_enabled !== '0',
+                    live_sync_enabled_bool: c.live_sync_enabled !== '0',
+                    vod_sync_enabled_bool: c.vod_sync_enabled !== '0',
+                    epg_sync_enabled_bool: c.epg_sync_enabled !== '0'
                 };
             } catch (e) { /* silent */ }
         },
 
         async fetchSchedulerStatus() {
             try {
-                const r = await fetch('/api/scheduler/status');
-                if (r.ok) this.schedulerStatus = await r.json();
+                this.schedulerStatus = await stbService.getSchedulerStatus();
             } catch (e) { /* silent */ }
         },
 
         async saveSchedulerConfig() {
             this.savingScheduler = true;
             try {
-                const r = await fetch('/api/scheduler/config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                await stbService.saveSchedulerConfig({
                     live_sync_hour: String(this.schedulerConfig.live_sync_hour),
                     vod_sync_hour: String(this.schedulerConfig.vod_sync_hour),
                     epg_sync_hour: String(this.schedulerConfig.epg_sync_hour),
@@ -512,16 +486,11 @@ const app = createApp({
                     live_sync_enabled: this.schedulerConfig.live_sync_enabled_bool ? '1' : '0',
                     vod_sync_enabled: this.schedulerConfig.vod_sync_enabled_bool ? '1' : '0',
                     epg_sync_enabled: this.schedulerConfig.epg_sync_enabled_bool ? '1' : '0'
-                })
                 });
-                if (r.ok) {
-                    this.showToast('定时设置已保存，即时生效');
-                    this.fetchSchedulerStatus();
-                } else {
-                    this.showToast('保存失败', 'error');
-                }
+                this.showToast('定时设置已保存，即时生效');
+                this.fetchSchedulerStatus();
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             } finally { this.savingScheduler = false; }
         },
 
@@ -558,8 +527,7 @@ const app = createApp({
         // ---- Sync ----
         async triggerSync() {
             try {
-                const r = await fetch('/api/sync/start', { method: 'POST' });
-                const res = await r.json();
+                const res = await syncService.triggerSync();
                 if (res.status === 'started') {
                     this.showToast('同步已启动');
                     this.startSyncStatusPolling();
@@ -570,14 +538,13 @@ const app = createApp({
                     this.showToast(res.message || '启动失败', 'error');
                 }
             } catch (e) {
-                this.showToast('通信异常', 'error');
+                this.showToast(e.message || '通信异常', 'error');
             }
         },
 
         async fetchSyncStatus() {
             try {
-                const r = await fetch('/api/sync/status');
-                this.syncStatus = await r.json();
+                this.syncStatus = await syncService.getStatus();
                 if (!this.syncStatus.running && this.syncStatusTimer) {
                     clearInterval(this.syncStatusTimer);
                     this.syncStatusTimer = null;
@@ -593,8 +560,7 @@ const app = createApp({
 
         async fetchDbStats() {
             try {
-                const r = await fetch('/api/sync/stats');
-                this.dbStats = await r.json();
+                this.dbStats = await syncService.getDbStats();
             } catch (e) { /* silent */ }
         },
 
@@ -611,16 +577,16 @@ const app = createApp({
 
         // ---- EPG ----
         async triggerEpgSync() {
-            try { const r = await fetch('/api/epg/sync', { method: 'POST' }); const res = await r.json();
+            try {
+                const res = await epgService.triggerSync();
                 if (res.status === 'started') { this.showToast('EPG 同步已启动'); this.startEpgSyncPolling(); }
                 else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.startEpgSyncPolling(); }
                 else this.showToast(res.message || '启动失败', 'error');
-            } catch (e) { this.showToast('通信异常', 'error'); }
+            } catch (e) { this.showToast(e.message || '通信异常', 'error'); }
         },
         async fetchEpgSyncStatus() {
             try {
-                const r = await fetch('/api/epg/sync/status');
-                this.epgSyncStatus = await r.json();
+                this.epgSyncStatus = await epgService.getSyncStatus();
                 if (!this.epgSyncStatus.running && this.epgSyncTimer) {
                     clearInterval(this.epgSyncTimer);
                     this.epgSyncTimer = null;
@@ -634,21 +600,20 @@ const app = createApp({
             } catch (e) {}
         },
         async fetchEpgStats() {
-            try { const r = await fetch('/api/epg/stats'); this.epgStats = await r.json(); } catch (e) {}
+            try { this.epgStats = await epgService.getStats(); } catch (e) {}
         },
         startEpgSyncPolling() {
             this.fetchEpgSyncStatus(); this.fetchEpgStats();
             if (!this.epgSyncTimer) this.epgSyncTimer = setInterval(() => this.fetchEpgSyncStatus(), 2000);
         },
         async fetchNowPlaying() {
-            try { const r = await fetch('/api/epg/programs/now'); const data = await r.json(); this.nowPlaying = data.items || []; this.nowPlayingLoaded = true; } catch (e) {}
+            try { const data = await epgService.getNowPlaying(); this.nowPlaying = data.items || []; this.nowPlayingLoaded = true; } catch (e) {}
         },
 
         // ---- Log ----
         async fetchLogs() {
             try {
-                const r = await fetch(`/api/logs?lines=200&level=${this.logLevelFilter}`);
-                const raw = await r.json();
+                const raw = await stbService.getLogs(200, this.logLevelFilter);
                 this.logs = raw.map(line => {
                     const m = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (.*)$/);
                     if (m) return { time: m[1], level: m[2], message: m[3] };
@@ -665,7 +630,7 @@ const app = createApp({
 
         async clearLogs() {
             try {
-                await fetch('/api/logs/clear', { method: 'POST' });
+                await stbService.clearLogs();
                 this.logs = [];
                 this.showToast('日志已清空');
             } catch (e) {
@@ -689,16 +654,14 @@ const app = createApp({
         async fetchLiveChannels(page = 1) {
             this.liveFilter.page = page;
             try {
-                const params = new URLSearchParams();
-                if (this.liveFilter.category_id !== null) params.append('category_id', this.liveFilter.category_id);
-                if (this.liveFilter.enabled !== null) params.append('enabled', this.liveFilter.enabled);
-                if (this.liveFilter.source !== null) params.append('source', this.liveFilter.source);
-                if (this.liveFilter.keyword) params.append('keyword', this.liveFilter.keyword);
-                params.append('page', this.liveFilter.page);
-                params.append('limit', this.liveFilter.limit);
-
-                const r = await fetch(`/api/live/channels?${params.toString()}`);
-                const data = await r.json();
+                const data = await liveService.getChannels({
+                    category_id: this.liveFilter.category_id,
+                    enabled: this.liveFilter.enabled,
+                    source: this.liveFilter.source,
+                    keyword: this.liveFilter.keyword || undefined,
+                    page: this.liveFilter.page,
+                    limit: this.liveFilter.limit
+                });
                 this.liveChannels = data.channels;
                 this.liveTotal = data.total;
                 this.tbodyKey++;
@@ -715,16 +678,14 @@ const app = createApp({
 
         async fetchLiveCategories() {
             try {
-                const r = await fetch('/api/live/categories');
-                this.liveCategories = await r.json();
+                this.liveCategories = await liveService.getCategories();
             } catch (e) { /* silent */ }
         },
 
         async fetchLiveConfig() {
             this.loadingConfig = true;
             try {
-                const r = await fetch('/api/live/config');
-                const config = await r.json();
+                const config = await liveService.getConfig();
                 this.liveConfig = {
                     ...config,
                     udpxy_enabled_bool: config.udpxy_enabled === '1',
@@ -740,8 +701,7 @@ const app = createApp({
 
         async fetchLiveStats() {
             try {
-                const r = await fetch('/api/live/stats');
-                this.liveStats = await r.json();
+                this.liveStats = await liveService.getStats();
             } catch (e) { /* silent */ }
         },
 
@@ -778,16 +738,11 @@ const app = createApp({
         async triggerLiveSync() {
             this.syncingLive = true;
             try {
-                const r = await fetch('/api/live/sync', { method: 'POST' });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(res.message);
-                    this.initLiveTab();
-                } else {
-                    this.showToast(res.message || '同步失败', 'error');
-                }
+                const res = await liveService.triggerSync();
+                this.showToast(res.message);
+                this.initLiveTab();
             } catch (e) {
-                this.showToast('网络请求异常', 'error');
+                this.showToast(e.message || '网络请求异常', 'error');
             } finally {
                 this.syncingLive = false;
             }
@@ -796,57 +751,32 @@ const app = createApp({
         async toggleChannelEnabled(ch) {
             const next_enabled = ch.is_enabled === 1 ? 0 : 1;
             try {
-                const r = await fetch(`/api/live/channels/${ch.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_enabled: next_enabled })
-                });
-                if (r.ok) {
-                    ch.is_enabled = next_enabled;
-                    this.showToast(ch.is_enabled ? '频道已启用' : '频道已禁用');
-                    this.fetchLiveStats();
-                } else {
-                    this.showToast('操作失败', 'error');
-                }
+                await liveService.updateChannel(ch.id, { is_enabled: next_enabled });
+                ch.is_enabled = next_enabled;
+                this.showToast(ch.is_enabled ? '频道已启用' : '频道已禁用');
+                this.fetchLiveStats();
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
         async saveChannelEdit() {
             if (!this.editingCh) return;
             try {
-                const r = await fetch(`/api/live/channels/${this.editingCh.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.editingCh)
-                });
-                if (r.ok) {
-                    this.showToast('频道修改成功');
-                    this.showEditChannelModal = false;
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else {
-                    const data = await r.json();
-                    this.showToast(data.detail || '修改失败', 'error');
-                }
+                await liveService.updateChannel(this.editingCh.id, this.editingCh);
+                this.showToast('频道修改成功');
+                this.showEditChannelModal = false;
+                this.fetchLiveChannels(this.liveFilter.page);
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
         async changeChannelCategory(ch) {
             try {
-                const r = await fetch(`/api/live/channels/${ch.id}`, {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category_id: ch.category_id })
-                });
-                if (r.ok) {
-                    this.showToast('分类已更新');
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else {
-                    const data = await r.json();
-                    this.showToast(data.detail || '更新失败', 'error');
-                }
+                await liveService.updateChannel(ch.id, { category_id: ch.category_id });
+                this.showToast('分类已更新');
+                this.fetchLiveChannels(this.liveFilter.page);
             } catch (e) {
                 this.showToast('网络错误', 'error');
             }
@@ -855,16 +785,12 @@ const app = createApp({
         async deleteChannel(id) {
             if (!confirm('确定要删除这个外部频道吗？')) return;
             try {
-                const r = await fetch(`/api/live/channels/${id}`, { method: 'DELETE' });
-                if (r.ok) {
-                    this.showToast('频道删除成功');
-                    this.fetchLiveChannels(this.liveFilter.page);
-                    this.fetchLiveStats();
-                } else {
-                    this.showToast('删除失败', 'error');
-                }
+                await liveService.deleteChannel(id);
+                this.showToast('频道删除成功');
+                this.fetchLiveChannels(this.liveFilter.page);
+                this.fetchLiveStats();
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
@@ -887,18 +813,10 @@ const app = createApp({
 
 
             try {
-                const r = await fetch('/api/live/config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (r.ok) {
-                    this.showToast('直播配置保存成功');
-                    this.showLiveConfigModal = false;
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else {
-                    this.showToast('配置保存失败', 'error');
-                }
+                await liveService.saveConfig(payload);
+                this.showToast('直播配置保存成功');
+                this.showLiveConfigModal = false;
+                this.fetchLiveChannels(this.liveFilter.page);
             } catch (e) {
                 this.showToast('网络错误', 'error');
             }
@@ -907,8 +825,7 @@ const app = createApp({
         // VOD 过滤设置（独立于 liveConfig，仅发送过滤字段，不影响直播配置）
         async fetchVodConfig() {
             try {
-                const r = await fetch('/api/vod-config/config');
-                const config = await r.json();
+                const config = await syncService.getVodConfig();
                 this.vodConfig.low_quality_filter_bool = config.low_quality_filter !== '0';
                 this.vodConfig.m3u8_filter_bool = config.m3u8_filter !== '0';
             } catch (e) {
@@ -922,18 +839,10 @@ const app = createApp({
                 m3u8_filter: this.vodConfig.m3u8_filter_bool ? '1' : '0'
             };
             try {
-                const r = await fetch('/api/vod-config/config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (r.ok) {
-                    this.showToast('过滤设置已保存');
-                } else {
-                    this.showToast('保存失败', 'error');
-                }
+                await syncService.saveVodConfig(payload);
+                this.showToast('过滤设置已保存');
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
@@ -979,18 +888,12 @@ const app = createApp({
                         this.categoryTbodyKey++;
                         this.$nextTick(() => { this.initCategorySortable(); });
                         try {
-                            const r = await fetch('/api/live/categories/reorder', {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ order })
-                            });
-                            if (r.ok) {
-                                this.showToast('分类排序已更新');
+                            await liveService.reorderCategories({ order });
+                            this.showToast('分类排序已更新');
                                 // 从服务器重新加载以保持数据一致
                                 await this.fetchLiveCategories();
                                 this.categoryTbodyKey++;
                                 this.$nextTick(() => { this.initCategorySortable(); });
-                            }
-                            else { this.showToast('保存排序失败', 'error'); }
                         } catch(e) { this.showToast('排序请求失败', 'error'); }
                     }
                 });
@@ -1003,66 +906,44 @@ const app = createApp({
                 return;
             }
             try {
-                const r = await fetch('/api/live/categories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.newCategory)
-                });
-                if (r.ok) {
-                    this.showToast('分类添加成功');
-                    await this.fetchLiveCategories();
-                    const nextIdx = this.liveCategories.length > 0
-                        ? Math.max(...this.liveCategories.map(c => c.sort_index)) + 1
-                        : 0;
-                    this.newCategory = { name: '', sort_index: nextIdx, color: '#6366f1', is_visible: 1, showColorPicker: false };
-                    this.categoryTbodyKey++;
-                    this.$nextTick(() => { this.initCategorySortable(); });
-                } else {
-                    const data = await r.json();
-                    this.showToast(data.detail || '添加失败', 'error');
-                }
+                await liveService.addCategory(this.newCategory);
+                this.showToast('分类添加成功');
+                await this.fetchLiveCategories();
+                const nextIdx = this.liveCategories.length > 0
+                    ? Math.max(...this.liveCategories.map(c => c.sort_index)) + 1
+                    : 0;
+                this.newCategory = { name: '', sort_index: nextIdx, color: '#6366f1', is_visible: 1, showColorPicker: false };
+                this.categoryTbodyKey++;
+                this.$nextTick(() => { this.initCategorySortable(); });
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
         async updateLiveCategory(cat) {
             try {
-                const r = await fetch(`/api/live/categories/${cat.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cat)
-                });
-                if (r.ok) {
-                    this.showToast('分类修改成功');
-                    await this.fetchLiveCategories();
-                    this.fetchLiveChannels(this.liveFilter.page);
-                    this.categoryTbodyKey++;
-                    this.$nextTick(() => { this.initCategorySortable(); });
-                } else {
-                    const data = await r.json();
-                    this.showToast(data.detail || '修改失败', 'error');
-                }
+                await liveService.updateCategory(cat.id, cat);
+                this.showToast('分类修改成功');
+                await this.fetchLiveCategories();
+                this.fetchLiveChannels(this.liveFilter.page);
+                this.categoryTbodyKey++;
+                this.$nextTick(() => { this.initCategorySortable(); });
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
         async deleteLiveCategory(id) {
             if (!confirm('确定要删除此分类吗？关联的频道将自动归入"未分类"。')) return;
             try {
-                const r = await fetch(`/api/live/categories/${id}`, { method: 'DELETE' });
-                if (r.ok) {
-                    this.showToast('分类删除成功');
-                    await this.fetchLiveCategories();
-                    this.fetchLiveChannels(this.liveFilter.page);
-                    this.categoryTbodyKey++;
-                    this.$nextTick(() => { this.initCategorySortable(); });
-                } else {
-                    this.showToast('删除失败', 'error');
-                }
+                await liveService.deleteCategory(id);
+                this.showToast('分类删除成功');
+                await this.fetchLiveCategories();
+                this.fetchLiveChannels(this.liveFilter.page);
+                this.categoryTbodyKey++;
+                this.$nextTick(() => { this.initCategorySortable(); });
             } catch (e) {
-                this.showToast('网络错误', 'error');
+                this.showToast(e.message || '网络错误', 'error');
             }
         },
 
@@ -1089,6 +970,7 @@ const app = createApp({
         async importExternalChannels() {
             this.importingChannels = true;
             try {
+                let res;
                 if (this.importMethod === 'file') {
                     if (!this.importFile) {
                         this.showToast('请先选择要上传的文件', 'error');
@@ -1096,41 +978,21 @@ const app = createApp({
                     }
                     const formData = new FormData();
                     formData.append('file', this.importFile);
-                    const r = await fetch('/api/live/import', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const res = await r.json();
-                    if (r.ok) {
-                        this.showToast(`导入成功！新增 ${res.new} 个，跳过 ${res.skipped} 个，总共 ${res.total} 个`);
-                        this.importFile = null;
-                        this.initLiveTab();
-                    } else {
-                        this.showToast(res.detail || res.message || '导入失败', 'error');
-                    }
+                    res = await liveService.importChannels(formData);
+                    this.showToast(`导入成功！新增 ${res.new} 个，跳过 ${res.skipped} 个，总共 ${res.total} 个`);
+                    this.importFile = null;
                 } else {
                     if (!this.importText.trim()) {
                         this.showToast('请粘贴文本内容再进行导入', 'error');
                         return;
                     }
-                    const r = await fetch('/api/live/import', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            content: this.importText
-                        })
-                    });
-                    const res = await r.json();
-                    if (r.ok) {
-                        this.showToast(`导入成功！新增 ${res.new} 个，跳过 ${res.skipped} 个，总共 ${res.total} 个`);
-                        this.importText = '';
-                        this.initLiveTab();
-                    } else {
-                        this.showToast(res.detail || res.message || '导入失败', 'error');
-                    }
+                    res = await liveService.importChannels({ content: this.importText });
+                    this.showToast(`导入成功！新增 ${res.new} 个，跳过 ${res.skipped} 个，总共 ${res.total} 个`);
+                    this.importText = '';
                 }
+                this.initLiveTab();
             } catch (e) {
-                this.showToast('导入过程中遭遇异常', 'error');
+                this.showToast(e.message || '导入过程中遭遇异常', 'error');
             } finally {
                 this.importingChannels = false;
             }
@@ -1152,8 +1014,7 @@ const app = createApp({
         },
         async fetchAliases() {
             try {
-                const r = await fetch('/api/live/aliases');
-                this.aliases = await r.json();
+                this.aliases = await liveService.getAliases();
             } catch(e) {}
         },
         async addAlias() {
@@ -1161,63 +1022,39 @@ const app = createApp({
                 this.showToast('原始名称和规范名称均不能为空', 'error'); return;
             }
             try {
-                const r = await fetch('/api/live/aliases', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.newAlias)
-                });
-                if (r.ok) {
-                    const res = await r.json();
-                    this.showToast('别名添加成功' + (res.affected_channels ? '，已更新 ' + res.affected_channels + ' 个频道' : ''));
-                    this.newAlias = { source_name: '', target_name: '' };
-                    this.fetchAliases();
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else {
-                    const data = await r.json();
-                    this.showToast(data.detail || '添加失败', 'error');
-                }
-            } catch(e) { this.showToast('网络错误', 'error'); }
+                const res = await liveService.addAlias(this.newAlias);
+                this.showToast('别名添加成功' + (res.affected_channels ? '，已更新 ' + res.affected_channels + ' 个频道' : ''));
+                this.newAlias = { source_name: '', target_name: '' };
+                this.fetchAliases();
+                this.fetchLiveChannels(this.liveFilter.page);
+            } catch(e) { this.showToast(e.message || '网络错误', 'error'); }
         },
         async saveAlias(a) {
             try {
-                const r = await fetch(`/api/live/aliases/${a.id}`, {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ source_name: a.source_name, target_name: a.target_name })
-                });
-                if (r.ok) {
-                    const res = await r.json();
-                    this.showToast('别名保存成功' + (res.affected_channels ? '，已更新 ' + res.affected_channels + ' 个频道' : ''));
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else {
-                    const data = await r.json();
-                    this.showToast(data.detail || '保存失败', 'error');
-                }
-            } catch(e) { this.showToast('网络错误', 'error'); }
+                const res = await liveService.updateAlias(a.id, { source_name: a.source_name, target_name: a.target_name });
+                this.showToast('别名保存成功' + (res.affected_channels ? '，已更新 ' + res.affected_channels + ' 个频道' : ''));
+                this.fetchLiveChannels(this.liveFilter.page);
+            } catch(e) { this.showToast(e.message || '网络错误', 'error'); }
         },
         async deleteAlias(id) {
             if (!confirm('确定要删除这个别名映射吗？相关频道将恢复原始名称。')) return;
             try {
-                const r = await fetch(`/api/live/aliases/${id}`, { method: 'DELETE' });
-                if (r.ok) {
-                    this.showToast('别名删除成功，频道已恢复原始名称');
-                    this.fetchAliases();
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else { this.showToast('删除失败', 'error'); }
-            } catch(e) { this.showToast('网络错误', 'error'); }
+                await liveService.deleteAlias(id);
+                this.showToast('别名删除成功，频道已恢复原始名称');
+                this.fetchAliases();
+                this.fetchLiveChannels(this.liveFilter.page);
+            } catch(e) { this.showToast(e.message || '网络错误', 'error'); }
         },
         async reapplyAliases() {
             try {
-                const r = await fetch('/api/live/aliases/reapply', { method: 'POST' });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(`已重新应用：${res.applied} 条映射，${res.affected} 个频道`);
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else { this.showToast(res.detail || '应用失败', 'error'); }
-            } catch(e) { this.showToast('网络错误', 'error'); }
+                const res = await liveService.reapplyAliases();
+                this.showToast(`已重新应用：${res.applied} 条映射，${res.affected} 个频道`);
+                this.fetchLiveChannels(this.liveFilter.page);
+            } catch(e) { this.showToast(e.message || '网络错误', 'error'); }
         },
         async exportAliases() {
             try {
-                const r = await fetch('/api/live/aliases/export');
-                const data = await r.json();
+                const data = await liveService.exportAliases();
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1235,23 +1072,16 @@ const app = createApp({
             try {
                 const text = await file.text();
                 const data = JSON.parse(text);
-                const r = await fetch('/api/live/aliases/import', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(`导入成功，共 ${res.imported} 条映射`);
-                    this.fetchAliases();
-                } else { this.showToast(res.detail || '导入失败', 'error'); }
+                const res = await liveService.importAliases(data);
+                this.showToast(`导入成功，共 ${res.imported} 条映射`);
+                this.fetchAliases();
             } catch(e) { this.showToast('文件解析失败，请检查 JSON 格式', 'error'); }
             e.target.value = '';
         },
 
         async exportCategoryMappings() {
             try {
-                const r = await fetch('/api/live/categories/mappings/export');
-                const data = await r.json();
+                const data = await liveService.exportCategoryMappings();
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1271,17 +1101,11 @@ const app = createApp({
             try {
                 const text = await file.text();
                 const data = JSON.parse(text);
-                const r = await fetch('/api/live/categories/mappings/import', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(`导入成功：关联了 ${res.imported_channels} 个频道的分类` + (res.created_categories ? `，自动创建了 ${res.created_categories} 个新分类` : ''));
-                    this.fetchLiveCategories();
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else { this.showToast(res.detail || '导入失败', 'error'); }
-            } catch(e) { this.showToast('文件解析失败，请检查 JSON 格式', 'error'); }
+                const res = await liveService.importCategoryMappings(data);
+                this.showToast(`导入成功：关联了 ${res.imported_channels} 个频道的分类` + (res.created_categories ? `，自动创建了 ${res.created_categories} 个新分类` : ''));
+                this.fetchLiveCategories();
+                this.fetchLiveChannels(this.liveFilter.page);
+            } catch(e) { this.showToast(e.message || '文件解析失败，请检查 JSON 格式', 'error'); }
             e.target.value = '';
         },
 
@@ -1296,25 +1120,13 @@ const app = createApp({
         async batchSetEnabled(enabled) {
             if (this.selectedChannelIds.length === 0) return;
             try {
-                const r = await fetch('/api/live/channels/batch-enabled', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ids: this.selectedChannelIds,
-                        enabled: enabled
-                    })
-                });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(res.message);
-                    this.selectedChannelIds = [];
-                    this.fetchLiveChannels(this.liveFilter.page);
-                    this.fetchLiveStats();
-                } else {
-                    this.showToast(res.detail || '批量设置状态失败', 'error');
-                }
+                const res = await liveService.batchEnabled(this.selectedChannelIds, enabled);
+                this.showToast(res.message);
+                this.selectedChannelIds = [];
+                this.fetchLiveChannels(this.liveFilter.page);
+                this.fetchLiveStats();
             } catch (e) {
-                this.showToast('网络请求异常', 'error');
+                this.showToast(e.message || '网络请求异常', 'error');
             }
         },
 
@@ -1322,25 +1134,13 @@ const app = createApp({
             const catId = parseInt(event.target.value);
             if (isNaN(catId) || this.selectedChannelIds.length === 0) return;
             try {
-                const r = await fetch('/api/live/channels/batch-category', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ids: this.selectedChannelIds,
-                        category_id: catId
-                    })
-                });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(res.message);
-                    this.selectedChannelIds = [];
-                    event.target.value = '';
-                    this.fetchLiveChannels(this.liveFilter.page);
-                } else {
-                    this.showToast(res.detail || '批量修改分类失败', 'error');
-                }
+                const res = await liveService.batchCategory(this.selectedChannelIds, catId);
+                this.showToast(res.message);
+                this.selectedChannelIds = [];
+                event.target.value = '';
+                this.fetchLiveChannels(this.liveFilter.page);
             } catch (e) {
-                this.showToast('网络请求异常', 'error');
+                this.showToast(e.message || '网络请求异常', 'error');
             }
         },
 
@@ -1356,24 +1156,13 @@ const app = createApp({
             }
             if (!confirm(`确定要删除选中的 ${this.selectedChannelIds.length} 个频道吗？`)) return;
             try {
-                const r = await fetch('/api/live/channels/batch-delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ids: this.selectedChannelIds
-                    })
-                });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(res.message);
-                    this.selectedChannelIds = [];
-                    this.fetchLiveChannels(this.liveFilter.page);
-                    this.fetchLiveStats();
-                } else {
-                    this.showToast(res.detail || '批量删除失败', 'error');
-                }
+                const res = await liveService.batchDelete(this.selectedChannelIds);
+                this.showToast(res.message);
+                this.selectedChannelIds = [];
+                this.fetchLiveChannels(this.liveFilter.page);
+                this.fetchLiveStats();
             } catch (e) {
-                this.showToast('网络请求异常', 'error');
+                this.showToast(e.message || '网络请求异常', 'error');
             }
         },
 
@@ -1389,35 +1178,22 @@ const app = createApp({
             });
             const order = sorted.map((ch, i) => ({ id: ch.id, sort_index: i }));
             try {
-                const r = await fetch('/api/live/channels/reorder', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order })
-                });
-                if (r.ok) {
-                    this.showToast('已按类别排序');
-                    this.fetchLiveChannels(1);
-                } else {
-                    this.showToast('排序失败', 'error');
-                }
+                await liveService.reorderChannels({ order });
+                this.showToast('已按类别排序');
+                this.fetchLiveChannels(1);
             } catch (e) {
-                this.showToast('网络异常', 'error');
+                this.showToast(e.message || '网络异常', 'error');
             }
         },
 
         async resetLiveChannelsOrder() {
             if (!confirm('确定要恢复默认排序吗？这会清除拖拽自定义顺序，并按系统序号/ID恢复初始顺序。')) return;
             try {
-                const r = await fetch('/api/live/channels/reset-order', { method: 'POST' });
-                const res = await r.json();
-                if (r.ok) {
-                    this.showToast(res.message);
-                    this.fetchLiveChannels(1);
-                } else {
-                    this.showToast('重置排序失败', 'error');
-                }
+                const res = await liveService.resetOrder();
+                this.showToast(res.message);
+                this.fetchLiveChannels(1);
             } catch (e) {
-                this.showToast('网络连接异常', 'error');
+                this.showToast(e.message || '网络连接异常', 'error');
             }
         },
 
@@ -1495,17 +1271,9 @@ const app = createApp({
                         this.$nextTick(async () => {
                             this.initSortable();
                             try {
-                                const r = await fetch('/api/live/channels/reorder', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ order })
-                                });
-                                if (r.ok) {
-                                    this.showToast(isBatch ? `批量排序成功 (${dragIds.length} 个频道)` : '排序更新成功');
-                                    this.fetchLiveStats();
-                                } else {
-                                    this.showToast('保存排序失败', 'error');
-                                }
+                                await liveService.reorderChannels({ order });
+                                this.showToast(isBatch ? `批量排序成功 (${dragIds.length} 个频道)` : '排序更新成功');
+                                this.fetchLiveStats();
                             } catch(e) {
                                 this.showToast('排序请求失败', 'error');
                             }
