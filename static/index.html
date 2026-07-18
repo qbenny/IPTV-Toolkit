@@ -12,34 +12,7 @@
 <body>
     <div id="app" v-cloak>
         <!-- 侧边栏导航 -->
-        <aside class="sidebar">
-            <div class="brand">
-                <span class="logo-icon">📺</span>
-                <h2>IPTV-Toolkit</h2>
-            </div>
-            
-            <nav class="nav-menu">
-                <a href="#" :class="['nav-item', { active: activeTab === 'stb' }]" @click.prevent="activeTab = 'stb'">
-                    <span class="nav-icon">⚙️</span> 系统配置
-                </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'vod' }]" @click.prevent="activeTab = 'vod'">
-                    <span class="nav-icon">🎬</span> VOD 点播管理
-                </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'live' }]" @click.prevent="activeTab = 'live'">
-                    <span class="nav-icon">📺</span> 直播频道管理
-                </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'epg' }]" @click.prevent="activeTab = 'epg'">
-                    <span class="nav-icon">📅</span> EPG 节目管理
-                </a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <button class="theme-toggle-btn" @click="toggleTheme" title="切换深色/浅色主题">
-                    <span v-if="theme === 'dark'">☀️ 浅色模式</span>
-                    <span v-else>🌙 深色模式</span>
-                </button>
-            </div>
-        </aside>
+        <sidebar-nav :active-tab="activeTab" :theme="theme" @nav="activeTab = $event" @toggle-theme="toggleTheme"></sidebar-nav>
 
         <!-- 主体内容区域 -->
         <main class="main-content">
@@ -79,295 +52,13 @@
             </header>
 
             <!-- 提示信息通知 -->
-            <transition name="slide-down">
-                <div v-if="toast.show" :class="['toast-notification', toast.type]">
-                    <span class="toast-icon">{{ toast.type === 'success' ? '✅' : '❌' }}</span>
-                    <span class="toast-message">{{ toast.message }}</span>
-                </div>
-            </transition>
+            <toast-notification ref="toastRef"></toast-notification>
 
             <!-- 板块一：系统配置 -->
-            <section v-if="activeTab === 'stb'" class="tab-pane">
-                <div class="card-grid cols-3">
-                    <!-- 定时同步设置 -->
-                    <div class="card form-card">
-                        <div class="card-header">
-                            <h3>定时自动同步管理</h3>
-                            <div class="scheduler-master">
-                                <span class="status-pill" :class="schedulerStatus.running ? 'on' : 'off'">
-                                    {{ schedulerStatus.running ? '运行中' : '已停止' }}
-                                </span>
-                                <label class="switch-toggle">
-                                    <input type="checkbox" v-model="schedulerConfig.scheduler_enabled_bool" @change="saveSchedulerConfig">
-                                    <span class="switch-slider"></span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="scheduler-tasks">
-                            <div class="task-row" v-for="task in schedulerTasks" :key="task.key">
-                                <div class="task-head">
-                                    <div class="task-title">
-                                        <span class="task-icon">{{ task.icon }}</span>
-                                        <span class="task-name">{{ task.name }} 同步时刻</span>
-                                    </div>
-                                    <label class="switch-toggle">
-                                        <input type="checkbox"
-                                               v-model="schedulerConfig[task.enabledKey]"
-                                               :disabled="!schedulerConfig.scheduler_enabled_bool"
-                                               @change="saveSchedulerConfig">
-                                        <span class="switch-slider"></span>
-                                    </label>
-                                </div>
-                                <div class="task-body">
-                                    <select class="hour-select"
-                                            v-model.number="schedulerConfig[task.hourKey]"
-                                            :disabled="!schedulerConfig.scheduler_enabled_bool || !schedulerConfig[task.enabledKey]"
-                                            @change="saveSchedulerConfig">
-                                        <option v-for="h in 24" :key="task.key+h" :value="h-1">每天 {{ String(h-1).padStart(2,'0') }}:00</option>
-                                    </select>
-                                    <div class="task-status">
-                                        <span :class="taskStatusClass(task.key)">{{ taskStatusText(task.key) }}</span>
-                                        <span class="text-muted" v-if="schedulerStatus.tasks[task.key]?.last_sync_time">
-                                            上次 {{ formatTime(schedulerStatus.tasks[task.key].last_sync_time) }}
-                                        </span>
-                                        <button class="btn btn-secondary btn-sm"
-                                                @click="manualSchedulerSync(task.key)"
-                                                :disabled="task.key === 'live' ? (syncingLive || !simStatus.is_authenticated)
-                                                         : task.key === 'epg'  ? epgSyncStatus.running
-                                                         : syncStatus.running">
-                                            🔄 手动同步
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card form-card">
-                        <div class="card-header">
-                            <h3>机顶盒鉴权参数</h3>
-                            <span class="badge">stb_config.json</span>
-                        </div>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>业务账号 (User ID)</label>
-                                <input type="text" v-model="stbConfig.user_id" placeholder="例如: 1234567890123456">
-                            </div>
-                            <div class="form-group">
-                                <label>终端设备 ID (STBID)</label>
-                                <input type="text" v-model="stbConfig.stb_id" placeholder="例如: 001003990060262001123456789ABCDE">
-                            </div>
-                            <div class="form-group">
-                                <label>物理 MAC 地址</label>
-                                <input type="text" v-model="stbConfig.mac_address" placeholder="例如: A0:B1:C2:D3:E4:F5">
-                            </div>
-                            <div class="form-group">
-                                <label>EPG 网关基础 URL</label>
-                                <input type="text" v-model="stbConfig.base_url" placeholder="例如: http://10.123.123.123:33200">
-                            </div>
-                            <div class="form-group">
-                                <label>动态算密 Key (DES Key)</label>
-                                <input type="text" v-model="stbConfig.des_key" placeholder="默认为 00000000">
-                            </div>
-                            <div class="form-group">
-                                <label>网卡出网 IP 地址 (留空开启动态探测)</label>
-                                <input type="text" v-model="stbConfig.ip_address" placeholder="空值将利用路由表自动探测绑定">
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary w-full" @click="saveStbConfig" :disabled="savingStb">
-                                <span class="spinner" v-if="savingStb"></span>
-                                {{ savingStb ? '正在保存并验证...' : '💾 保存配置并测试登录' }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="card status-card">
-                        <div class="card-header">
-                            <h3>仿真鉴权运行状态</h3>
-                        </div>
-                        <div class="status-list status-grid-2">
-                            <div class="status-item">
-                                <span class="status-label">当前运行 IP</span>
-                                <span class="status-val highlight">{{ stbConfig.ip_address || resolvedIp || '未获取 (空值等待动态分配)' }}</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">IP 分配模式</span>
-                                <span class="status-val">{{ stbConfig.ip_address ? '静态手动指定' : '系统动态探测路由' }}</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">DES 模块检测</span>
-                                <span class="status-val text-success">✔️ Crypto.Cipher 动态算密激活</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">鉴权状态</span>
-                                <span :class="simStatus.is_authenticated ? 'status-val text-success' : 'status-val text-muted'">
-                                    {{ simStatus.is_authenticated ? '✅ 已登录' : '⭕ 未登录' }}
-                                </span>
-                            </div>
-                            <div class="status-item" v-if="simStatus.is_authenticated">
-                                <span class="status-label">EPG 网关</span>
-                                <span class="status-val highlight">{{ simStatus.epg_base_url || '—' }}</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">JSESSIONID</span>
-                                <span class="status-val token-val" v-if="simStatus.jsessionid" :title="simStatus.jsessionid">
-                                    <span class="token-text">{{ maskToken(simStatus.jsessionid) }}</span>
-                                    <button class="copy-btn" @click="copyToClipboard(simStatus.jsessionid)" title="复制">📋</button>
-                                </span>
-                                <span class="status-val text-muted" v-else>—</span>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-label">UserToken</span>
-                                <span class="status-val token-val" v-if="simStatus.user_token" :title="simStatus.user_token">
-                                    <span class="token-text">{{ maskToken(simStatus.user_token) }}</span>
-                                    <button class="copy-btn" @click="copyToClipboard(simStatus.user_token)" title="复制">📋</button>
-                                </span>
-                                <span class="status-val text-muted" v-else>—</span>
-                            </div>
-                            <div class="status-item full">
-                                <span class="status-label">说明</span>
-                                <p class="status-desc">机顶盒配置用于与电信 EPG 网关建立安全链路以获取点播播放 URL。建议直接保持 IP 地址为空，以允许程序根据宿主机当前连通 EPG 节点的路由状况自动生成正确的源 IP。</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 系统运行日志 -->
-                <div class="card log-card mt-16">
-                    <div class="card-header">
-                        <div class="header-left">
-                            <h3>系统运行日志</h3>
-                        </div>
-                        <div class="log-actions">
-                            <select v-model="logLevelFilter" class="log-select">
-                                <option value="ALL">全部日志 (ALL)</option>
-                                <option value="DEBUG">调试 (DEBUG及以上)</option>
-                                <option value="INFO">信息 (INFO及以上)</option>
-                                <option value="WARNING">警告 (WARN及以上)</option>
-                                <option value="ERROR">错误 (ERROR及以上)</option>
-                            </select>
-                            <button class="btn btn-secondary btn-sm" @click="clearLogs">🗑️ 清空日志</button>
-                            <label class="auto-scroll-label">
-                                <input type="checkbox" v-model="logAutoScroll"> 自动滚动
-                            </label>
-                        </div>
-                    </div>
-                    <div class="log-container" ref="logContainer">
-                        <div v-if="filteredLogs.length === 0" class="log-empty">暂无相关运行日志</div>
-                        <div v-else v-for="(log, idx) in filteredLogs" :key="idx" :class="['log-item', log.level]">
-                            <span class="log-time">{{ log.time }}</span>
-                            <span :class="['log-level-text', log.level.toLowerCase()]">{{ log.level }}</span>
-                            <span class="log-message">{{ log.message }}</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <stb-tab v-if="activeTab === 'stb'"></stb-tab>
 
             <!-- 板块二：VOD 点播管理 -->
-            <section v-if="activeTab === 'vod'" class="tab-pane">
-                <div class="card-grid">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>数据同步控制</h3>
-                        </div>
-                        <div class="status-list mt-15">
-                            <div class="status-item">
-                                <span class="status-label">同步状态</span>
-                                <span :class="['status-val', syncStatus.running ? 'text-warning' : 'text-success']">
-                                    {{ syncStatus.running ? '⏳ 同步中...' : (syncStatus.last_sync_time ? '✅ 已同步' : '⭕ 未同步') }}
-                                </span>
-                            </div>
-                            <div class="status-item" v-if="syncStatus.running">
-                                <span class="status-label">当前进度</span>
-                                <span class="status-val highlight">{{ syncStatus.progress }}</span>
-                            </div>
-                            <div class="status-item" v-if="syncStatus.last_sync_time">
-                                <span class="status-label">上次同步</span>
-                                <span class="status-val">{{ formatTime(syncStatus.last_sync_time) }}</span>
-                            </div>
-                            <div class="status-item" v-if="syncStatus.last_error">
-                                <span class="status-label">错误信息</span>
-                                <span class="status-val text-error">{{ syncStatus.last_error }}</span>
-                            </div>
-                        </div>
-                        <div class="form-actions mt-20">
-                            <button class="btn btn-primary w-full" @click="triggerSync" :disabled="syncStatus.running">
-                                {{ syncStatus.running ? '⏳ 同步中...' : '🔄 开始全量同步' }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>数据库统计</h3>
-                        </div>
-                        <div class="status-list mt-15">
-                            <div class="status-item">
-                                <span class="status-label">总条目数</span>
-                                <span class="status-val highlight">{{ dbStats.total }}</span>
-                            </div>
-                            <div class="status-item" v-for="(count, typeName) in dbStats.types" :key="typeName">
-                                <span class="status-label">{{ typeName }}</span>
-                                <span class="status-val">{{ count }} 条</span>
-                            </div>
-                            <div v-if="dbStats.total === 0" class="status-item">
-                                <span class="status-label">数据库为空，请先执行同步</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mt-20">
-                    <div class="card-header">
-                        <h3>VOD 过滤设置</h3>
-                    </div>
-                    <div class="status-list mt-15">
-
-                        <div class="form-group inline-checkbox-group mb-15">
-                            <div class="switch-item">
-                                <label class="switch-toggle">
-                                    <input type="checkbox" v-model="vodConfig.low_quality_filter_bool">
-                                    <span class="switch-slider"></span>
-                                </label>
-                                <span class="switch-label-text">🗑️ 过滤低质量内容</span>
-                            </div>
-                            <small class="form-help text-muted">屏蔽 电视剧/综艺 的 ep=0&sc=0 垃圾，纪录 无海报垃圾。电影/少儿/动漫 不受影响。重启 TVBox 生效。</small>
-                        </div>
-
-                        <div class="form-group inline-checkbox-group mb-10">
-                            <div class="switch-item">
-                                <label class="switch-toggle">
-                                    <input type="checkbox" v-model="vodConfig.m3u8_filter_bool">
-                                    <span class="switch-slider"></span>
-                                </label>
-                                <span class="switch-label-text">📦 屏蔽 m3u8 内容池</span>
-                            </div>
-                            <small class="form-help text-muted">屏蔽 JHT/YANHUA/YANKUM 三个池（~1645 条，格式不兼容）。重启 TVBox 生效。</small>
-                        </div>
-
-                        <div class="form-actions mt-15">
-                            <button class="btn btn-primary w-full" @click="saveVodConfig">💾 保存过滤设置</button>
-                        </div>
-
-                    </div>
-                </div>
-
-                <div class="card mt-20">
-                    <div class="card-header">
-                        <h3>同步说明</h3>
-                    </div>
-                    <div class="status-list mt-10">
-                        <p class="status-desc">
-                            📥 数据来源：VIS API <code>api/search/filter.json</code><br>
-                            📊 同步类型：电视剧、电影、综艺、动漫、少儿<br>
-                            🔄 同步方式：全量覆盖（每日建议执行一次）<br>
-                            ⚡ TVBox 接口基于本地 SQLite 数据库，支持 country / year 多条件过滤和评分排序
-                        </p>
-                    </div>
-                </div>
-            </section>
+            <vod-tab v-if="activeTab === 'vod'"></vod-tab>
 
             <!-- 板块四：直播频道管理 -->
             <section v-if="activeTab === 'live'" class="tab-pane">
@@ -584,36 +275,7 @@
             </section>
 
             <!-- 板块五：EPG 节目管理 -->
-            <section v-if="activeTab === 'epg'" class="tab-pane">
-                <div class="card-grid">
-                    <div class="card"><div class="card-header"><h3>EPG 节目同步</h3></div>
-                        <div class="status-list" style="margin-top:15px;">
-                            <div class="status-item"><span class="status-label">同步状态</span><span :class="['status-val',epgSyncStatus.running?'text-warning':(epgSyncStatus.last_sync_time?'text-success':'text-muted')]">{{ epgSyncStatus.running?'同步中...':(epgSyncStatus.last_sync_time?'已同步':'未同步') }}</span></div>
-                            <div class="status-item" v-if="epgSyncStatus.running"><span class="status-label">进度</span><span class="status-val highlight">{{ epgSyncStatus.progress }}</span></div>
-                            <div class="status-item" v-if="epgSyncStatus.last_sync_time"><span class="status-label">上次同步</span><span class="status-val">{{ formatTime(epgSyncStatus.last_sync_time) }}</span></div>
-                        </div>
-                        <div class="form-actions" style="margin-top:20px;">
-                            <button class="btn btn-primary" @click="triggerEpgSync" :disabled="epgSyncStatus.running" style="width: 100%;">
-                                {{ epgSyncStatus.running?'同步中...':'开始 EPG 同步' }}
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card"><div class="card-header"><h3>EPG 统计</h3></div>
-                        <div class="status-list" style="margin-top:15px;">
-                            <div class="status-item"><span class="status-label">节目总数</span><span class="status-val highlight">{{ epgStats.total_programs }}</span></div>
-                            <div class="status-item"><span class="status-label">频道数</span><span class="status-val text-success">{{ epgStats.total_channels }}</span></div>
-                            <div class="status-item"><span class="status-label">日期范围</span><span class="status-val">{{ epgStats.date_range?.earliest||'-' }} ~ {{ epgStats.date_range?.latest||'-' }}</span></div>
-                        </div>
-                        <p class="status-desc" style="margin-top:16px;">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
-                    </div>
-                </div>
-                <div class="card" style="margin-top:20px;"><div class="card-header"><h3>当前正在播放</h3><button class="btn btn-secondary btn-sm" @click="fetchNowPlaying">刷新</button></div>
-                    <div class="live-ch-list" style="margin-top:10px;max-height:400px;overflow-y:auto;">
-                        <div v-if="nowPlaying.length===0" style="padding:20px;text-align:center;color:var(--text-muted);">{{ nowPlayingLoaded?'无正在播放节目':'点击刷新' }}</div>
-                        <div v-for="p in nowPlaying" :key="p.channel_id" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;font-size:14px;"><span><strong>{{ p.channel_name }}</strong><span style="color:var(--text-muted);margin-left:8px;">{{ p.title }}</span></span><span style="color:var(--text-muted);font-size:12px;">{{ p.start_time?.slice(11,16) }} - {{ p.end_time?.slice(11,16) }}</span></div>
-                    </div>
-                </div>
-            </section>
+            <epg-tab v-if="activeTab === 'epg'"></epg-tab>
         </main>
 
 
@@ -704,17 +366,7 @@
                         <!-- 新增分类 -->
                         <div class="category-add-inline">
                             <input type="text" v-model="newCategory.name" placeholder="分类名称" class="input-sm" style="flex:1;">
-                            <div class="color-picker-row">
-                                <span class="color-dot"
-                                      :style="{ background: newCategory.color || '#6366f1' }"
-                                      @click.stop="newCategory.showColorPicker = !newCategory.showColorPicker"></span>
-                                <div v-if="newCategory.showColorPicker" class="color-picker-mask" @click="newCategory.showColorPicker = false"></div>
-                                <div v-if="newCategory.showColorPicker" class="color-picker-popup" @click.stop>
-                                    <span v-for="c in presetColors" :key="c" class="color-dot"
-                                          :style="{ background: c, boxShadow: newCategory.color === c ? '0 0 0 2px #fff, 0 0 0 4px ' + c : '' }"
-                                          @click="newCategory.color = c; newCategory.showColorPicker = false"></span>
-                                </div>
-                            </div>
+                            <color-picker :color="newCategory.color" @select="newCategory.color = $event"></color-picker>
                             <button class="btn btn-primary btn-sm" @click="addLiveCategory">＋ 添加</button>
                         </div>
                         
@@ -742,17 +394,7 @@
                                             <span>{{ cat.sort_index }}</span>
                                         </td>
                                         <td style="text-align: center;">
-                                            <div class="color-picker-row">
-                                                <span class="color-dot"
-                                                      :style="{ background: cat.color || '#666' }"
-                                                      @click.stop="cat.showColorPicker = !cat.showColorPicker"></span>
-                                                <div v-if="cat.showColorPicker" class="color-picker-mask" @click="cat.showColorPicker = false"></div>
-                                                <div v-if="cat.showColorPicker" class="color-picker-popup" @click.stop>
-                                                    <span v-for="c in presetColors" :key="c" class="color-dot"
-                                                          :style="{ background: c, boxShadow: cat.color === c ? '0 0 0 2px #fff, 0 0 0 4px ' + c : '' }"
-                                                          @click="cat.color = c; cat.showColorPicker = false; updateLiveCategory(cat)"></span>
-                                                </div>
-                                            </div>
+                                            <color-picker :color="cat.color" @select="cat.color = $event; updateLiveCategory(cat)"></color-picker>
                                         </td>
                                         <td style="text-align: center;">
                                             <div class="row-actions justify-center">
@@ -991,6 +633,12 @@
     <script src="js/api/syncService.js"></script>
     <script src="js/api/epgService.js"></script>
     <script src="js/api/liveService.js"></script>
+    <script src="js/components/shared/ToastNotification.js"></script>
+    <script src="js/components/shared/ColorPicker.js"></script>
+    <script src="js/components/shared/SidebarNav.js"></script>
+    <script src="js/components/StbTab.js"></script>
+    <script src="js/components/VodTab.js"></script>
+    <script src="js/components/EpgTab.js"></script>
     <script src="js/app.js?v=2.0"></script>
 </body>
 </html>

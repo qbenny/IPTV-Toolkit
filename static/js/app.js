@@ -7,13 +7,23 @@
 const { createApp } = Vue;
 
 const app = createApp({
+    provide() {
+        return {
+            showToast: this.showToast,
+            simStatus: this.simStatus,
+            syncingLive: this.syncingLive,
+            triggerSync: this.triggerSync,
+            triggerEpgSync: this.triggerEpgSync,
+            triggerLiveSync: this.triggerLiveSync,
+            formatTime: this.formatTime
+        };
+    },
     data() {
         return {
             activeTab: (() => { const t = localStorage.getItem('active_tab'); return t === 'sync' ? 'vod' : t || 'stb'; })(),
             theme: 'dark',
 
-            // Toast
-            toast: { show: false, message: '', type: 'success', timeoutId: null },
+
 
             // Tab info
             tabTitles: {
@@ -29,38 +39,11 @@ const app = createApp({
                 epg: '从 VIS 节目单 API 同步 EPG 数据，生成 XMLTV'
             },
 
-            // Plate 1: STB Config
-            stbConfig: {
-                user_id: '', stb_id: '', mac_address: '',
-                base_url: '', des_key: '', ip_address: ''
-            },
-            resolvedIp: '',
-            savingStb: false,
+            // Plate 1: Core
             simStatus: { is_authenticated: false, epg_base_url: null, user_token: null, jsessionid: null },
             simStatusTimer: null,
-            schedulerStatusTimer: null,
 
-            // Plate 1: 定时同步设置
-            schedulerConfig: { live_sync_hour: 0, vod_sync_hour: 1, epg_sync_hour: 1, scheduler_enabled_bool: true, live_sync_enabled_bool: true, vod_sync_enabled_bool: true, epg_sync_enabled_bool: true },
-            schedulerStatus: { running: false, config: {}, tasks: {} },
-            savingScheduler: false,
-            taskLabels: { live: '直播频道', vod: 'VOD 点播', epg: 'EPG 节目单' },
-            schedulerTasks: [
-                { key: 'live', icon: '📺', name: '直播', hourKey: 'live_sync_hour', enabledKey: 'live_sync_enabled_bool' },
-                { key: 'epg',  icon: '📅', name: 'EPG', hourKey: 'epg_sync_hour',  enabledKey: 'epg_sync_enabled_bool' },
-                { key: 'vod',  icon: '🎬', name: 'VOD', hourKey: 'vod_sync_hour',  enabledKey: 'vod_sync_enabled_bool' }
-            ],
-
-            // Plate 2: Sync
-            syncStatus: {
-                running: false, progress: '', current_type: '',
-                done: 0, total: 0, last_sync_time: null, last_error: null
-            },
-            dbStats: { total: 0, types: {} },
-            syncStatusTimer: null,
-            previousSyncRunning: false,
-
-            // Plate 4: Live Channel Management
+            // Plate 2: Live Channel Management
             liveFilter: {
                 category_id: null, enabled: null, source: null, keyword: '', page: 1, limit: 10000
             },
@@ -73,11 +56,6 @@ const app = createApp({
                 m3u_dual_line_bool: false, udpxy_enabled_bool: false
             },
             loadingConfig: false,
-            // VOD 过滤设置（独立于 liveConfig，避免保存时覆盖直播配置）
-            vodConfig: {
-                low_quality_filter_bool: true,
-                m3u8_filter_bool: true
-            },
             newCategory: { name: '', sort_index: 0, color: '#6366f1', is_visible: 1 },
             editingCh: null,
             showAliasModal: false,
@@ -89,7 +67,6 @@ const app = createApp({
             categoryTbodyKey: 0,
             showEditChannelModal: false,
             syncingLive: false,
-            presetColors: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#e11d48'],
             importMethod: 'text',
             importText: '',
             importFile: null,
@@ -100,13 +77,6 @@ const app = createApp({
             selectAllChannels: false,
             tbodyKey: 0,
 
-            // Plate 5: EPG
-            epgSyncStatus: { running: false, progress: '', last_sync_time: null },
-            epgSyncTimer: null,
-            previousEpgRunning: false,
-            epgStats: { total_programs: 0, total_channels: 0, date_range: null },
-            nowPlaying: [], nowPlayingLoaded: false,
-
             // EPG Preview Modal
             showEpgPreviewModal: false,
             epgPreviewChannel: null,
@@ -115,24 +85,10 @@ const app = createApp({
             epgLoading: false,
             epgPrograms: [],
 
-            // Plate 3: Log
-            logs: [],
-            logLevelFilter: 'ALL',
-            logAutoScroll: true,
-            logPollTimer: null
         };
     },
 
     computed: {
-        filteredLogs() {
-            if (this.logLevelFilter === 'ALL') return this.logs;
-            const levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'];
-            const minIdx = levels.indexOf(this.logLevelFilter);
-            return this.logs.filter(log => {
-                const idx = levels.indexOf(log.level);
-                return idx >= minIdx;
-            });
-        },
         vodApiLinks() {
             const origin = window.location.origin;
             return { tvbox: `${origin}/zjvod`, api: `${origin}/api/vod` };
@@ -165,16 +121,8 @@ const app = createApp({
             this.fetchSimStatus(); // Refresh auth status on tab switch
             if (newTab === 'stb') {
                 this.startSimStatusPolling();
-                this.fetchSchedulerConfig();
-                this.fetchSchedulerStatus();
-                this.startLogPolling();
-            } else if (newTab === 'vod') {
-                this.startSyncStatusPolling();
             } else if (newTab === 'live') {
                 this.initLiveTab();
-            } else if (newTab === 'epg') {
-                this.fetchEpgStats();
-                this.startEpgSyncPolling();
             }
         },
         selectedChannelIds(newVal) {
@@ -198,19 +146,11 @@ const app = createApp({
 
     created() {
         this.initTheme();
-        this.fetchStbConfig();
-        this.fetchDbStats();
-        this.fetchSimStatus(); // Initial fetch of auth status globally
-        this.fetchVodConfig();  // 加载 VOD 过滤设置（独立于 liveConfig）
-        this.fetchSchedulerConfig();  // 加载定时同步钟点配置
-        this.fetchSchedulerStatus();  // 加载调度器运行状态
+        this.fetchSimStatus();
         if (this.activeTab === 'stb') {
             this.startSimStatusPolling();
-            this.startLogPolling();
         } else if (this.activeTab === 'live') {
             this.initLiveTab();
-        } else if (this.activeTab === 'vod') {
-            this.startSyncStatusPolling();
         }
     },
 
@@ -376,271 +316,43 @@ const app = createApp({
 
         // ---- Toast ----
         showToast(msg, type = 'success') {
-            if (this.toast.timeoutId) clearTimeout(this.toast.timeoutId);
-            this.toast.show = true;
-            this.toast.message = msg;
-            this.toast.type = type;
-            this.toast.timeoutId = setTimeout(() => { this.toast.show = false; }, 3000);
+            const toast = this.$refs.toastRef;
+            if (toast) toast.show(msg, type);
         },
 
         // ---- Polling ----
         stopAllPolling() {
-            [this.simStatusTimer, this.syncStatusTimer, this.logPollTimer, this.schedulerStatusTimer, this.epgSyncTimer].forEach(t => {
-                if (t) { clearInterval(t); }
-            });
-            this.simStatusTimer = this.syncStatusTimer = this.logPollTimer = this.schedulerStatusTimer = this.epgSyncTimer = null;
+            if (this.simStatusTimer) { clearInterval(this.simStatusTimer); this.simStatusTimer = null; }
         },
 
-        // ---- STB Config ----
-        async fetchStbConfig() {
-            try {
-                this.stbConfig = await stbService.getStbConfig();
-            } catch (e) { /* silent */ }
-        },
 
+
+        // ---- Sim Status (global poll) ----
         async fetchSimStatus() {
             try {
                 const d = await stbService.getSimStatus();
                 this.simStatus = d;
-                if (d.ip_address) this.resolvedIp = d.ip_address;
             } catch (e) { /* silent */ }
         },
 
         startSimStatusPolling() {
             this.fetchSimStatus();
             if (!this.simStatusTimer) this.simStatusTimer = setInterval(() => this.fetchSimStatus(), 5000);
-            // 调度器状态每 10s 刷新，使总开关/运行状态即时反映真实情况
-            this.fetchSchedulerStatus();
-            if (!this.schedulerStatusTimer) this.schedulerStatusTimer = setInterval(() => this.fetchSchedulerStatus(), 10000);
         },
 
-        maskToken(token) {
-            if (!token || token.length <= 12) return token;
-            return token.substring(0, 6) + '••••••••' + token.substring(token.length - 6);
-        },
-
-        async copyToClipboard(text) {
-            try {
-                if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                    this.showToast('已复制到剪贴板');
-                    return;
-                }
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed'; ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                try {
-                    ta.select();
-                    document.execCommand('copy');
-                    this.showToast('已复制到剪贴板');
-                } finally {
-                    document.body.removeChild(ta);
-                }
-            } catch (e) {
-                this.showToast('复制失败', 'error');
-            }
-        },
-
-        async saveStbConfig() {
-            this.savingStb = true;
-            try {
-                const res = await stbService.saveStbConfig(this.stbConfig);
-                this.showToast(res.message, res.status === 'warning' ? 'error' : 'success');
-                await this.fetchStbConfig();
-            } catch (e) {
-                this.showToast(e.message || '通信异常', 'error');
-            } finally { this.savingStb = false; }
-        },
-
-        // ---- 定时同步设置（钟点存于 live_config，状态来自调度器）----
-        async fetchSchedulerConfig() {
-            try {
-                const c = await stbService.getSchedulerConfig();
-                this.schedulerConfig = {
-                    live_sync_hour: parseInt(c.live_sync_hour ?? 0) || 0,
-                    vod_sync_hour: parseInt(c.vod_sync_hour ?? 1) || 0,
-                    epg_sync_hour: parseInt(c.epg_sync_hour ?? 1) || 0,
-                    scheduler_enabled_bool: c.scheduler_enabled !== '0',
-                    live_sync_enabled_bool: c.live_sync_enabled !== '0',
-                    vod_sync_enabled_bool: c.vod_sync_enabled !== '0',
-                    epg_sync_enabled_bool: c.epg_sync_enabled !== '0'
-                };
-            } catch (e) { /* silent */ }
-        },
-
-        async fetchSchedulerStatus() {
-            try {
-                this.schedulerStatus = await stbService.getSchedulerStatus();
-            } catch (e) { /* silent */ }
-        },
-
-        async saveSchedulerConfig() {
-            this.savingScheduler = true;
-            try {
-                await stbService.saveSchedulerConfig({
-                    live_sync_hour: String(this.schedulerConfig.live_sync_hour),
-                    vod_sync_hour: String(this.schedulerConfig.vod_sync_hour),
-                    epg_sync_hour: String(this.schedulerConfig.epg_sync_hour),
-                    scheduler_enabled: this.schedulerConfig.scheduler_enabled_bool ? '1' : '0',
-                    live_sync_enabled: this.schedulerConfig.live_sync_enabled_bool ? '1' : '0',
-                    vod_sync_enabled: this.schedulerConfig.vod_sync_enabled_bool ? '1' : '0',
-                    epg_sync_enabled: this.schedulerConfig.epg_sync_enabled_bool ? '1' : '0'
-                });
-                this.showToast('定时设置已保存，即时生效');
-                this.fetchSchedulerStatus();
-            } catch (e) {
-                this.showToast(e.message || '网络错误', 'error');
-            } finally { this.savingScheduler = false; }
-        },
-
-        // 调度器任务的"手动同步"入口，按 key 分发到对应 trigger
-        async manualSchedulerSync(key) {
-            if (key === 'live') return this.triggerLiveSync();
-            if (key === 'epg')  return this.triggerEpgSync();
-            if (key === 'vod')  return this.triggerSync();
-        },
-
-        // 任务状态文字（已同步 / 未同步 / 今日放弃 / 待重试 / 待执行 / 已禁用）
-        taskStatusText(key) {
-            const t = this.schedulerStatus.tasks?.[key];
-            const enabled = this.schedulerConfig[`${key}_sync_enabled_bool`];
-            if (!enabled) return '⛔ 已禁用';
-            if (!t) return '⏳ 待执行';
-            if (t.done_today) return '✅ 今日已同步';
-            if (t.gave_up) return '❌ 今日放弃';
-            if (t.retrying) return '🔁 待重试';
-            return '⏳ 待执行';
-        },
-
-        // 任务状态样式类
-        taskStatusClass(key) {
-            const t = this.schedulerStatus.tasks?.[key];
-            const enabled = this.schedulerConfig[`${key}_sync_enabled_bool`];
-            if (!enabled) return 'text-muted';
-            if (!t) return 'text-muted';
-            if (t.done_today) return 'text-success';
-            if (t.gave_up) return 'text-error';
-            return 'text-muted';
-        },
-
-        // ---- Sync ----
+        // ---- Sync (VOD/EPG) light wrappers (StbTab manual sync uses these) ----
         async triggerSync() {
-            try {
-                const res = await syncService.triggerSync();
-                if (res.status === 'started') {
-                    this.showToast('同步已启动');
-                    this.startSyncStatusPolling();
-                } else if (res.status === 'already_running') {
-                    this.showToast(res.message, 'error');
-                    this.startSyncStatusPolling();
-                } else {
-                    this.showToast(res.message || '启动失败', 'error');
-                }
-            } catch (e) {
-                this.showToast(e.message || '通信异常', 'error');
-            }
+            try { const res = await syncService.triggerSync(); this.showToast(res.message || '同步已启动'); }
+            catch (e) { this.showToast(e.message || '通信异常', 'error'); }
         },
-
-        async fetchSyncStatus() {
-            try {
-                this.syncStatus = await syncService.getStatus();
-                if (!this.syncStatus.running && this.syncStatusTimer) {
-                    clearInterval(this.syncStatusTimer);
-                    this.syncStatusTimer = null;
-                    // 只在本次轮询"从 running 变 not-running"时才弹 toast
-                    if (this.previousSyncRunning && this.syncStatus.last_sync_time) {
-                        this.showToast('同步完成!');
-                        this.fetchDbStats();
-                    }
-                }
-                this.previousSyncRunning = this.syncStatus.running;
-            } catch (e) { /* silent */ }
-        },
-
-        async fetchDbStats() {
-            try {
-                this.dbStats = await syncService.getDbStats();
-            } catch (e) { /* silent */ }
-        },
-
-        startSyncStatusPolling() {
-            this.fetchSyncStatus();
-            this.fetchDbStats();
-            if (!this.syncStatusTimer) this.syncStatusTimer = setInterval(() => this.fetchSyncStatus(), 2000);
+        async triggerEpgSync() {
+            try { const res = await epgService.triggerSync(); this.showToast(res.message || 'EPG 同步已启动'); }
+            catch (e) { this.showToast(e.message || '通信异常', 'error'); }
         },
 
         formatTime(ts) {
             if (!ts) return '—';
             return new Date(ts * 1000).toLocaleString('zh-CN');
-        },
-
-        // ---- EPG ----
-        async triggerEpgSync() {
-            try {
-                const res = await epgService.triggerSync();
-                if (res.status === 'started') { this.showToast('EPG 同步已启动'); this.startEpgSyncPolling(); }
-                else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.startEpgSyncPolling(); }
-                else this.showToast(res.message || '启动失败', 'error');
-            } catch (e) { this.showToast(e.message || '通信异常', 'error'); }
-        },
-        async fetchEpgSyncStatus() {
-            try {
-                this.epgSyncStatus = await epgService.getSyncStatus();
-                if (!this.epgSyncStatus.running && this.epgSyncTimer) {
-                    clearInterval(this.epgSyncTimer);
-                    this.epgSyncTimer = null;
-                    // 只在本次轮询"从 running 变 not-running"时才弹 toast
-                    if (this.previousEpgRunning && this.epgSyncStatus.last_sync_time) {
-                        this.showToast('EPG 同步完成!');
-                        this.fetchEpgStats();
-                    }
-                }
-                this.previousEpgRunning = this.epgSyncStatus.running;
-            } catch (e) {}
-        },
-        async fetchEpgStats() {
-            try { this.epgStats = await epgService.getStats(); } catch (e) {}
-        },
-        startEpgSyncPolling() {
-            this.fetchEpgSyncStatus(); this.fetchEpgStats();
-            if (!this.epgSyncTimer) this.epgSyncTimer = setInterval(() => this.fetchEpgSyncStatus(), 2000);
-        },
-        async fetchNowPlaying() {
-            try { const data = await epgService.getNowPlaying(); this.nowPlaying = data.items || []; this.nowPlayingLoaded = true; } catch (e) {}
-        },
-
-        // ---- Log ----
-        async fetchLogs() {
-            try {
-                const raw = await stbService.getLogs(200, this.logLevelFilter);
-                this.logs = raw.map(line => {
-                    const m = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (.*)$/);
-                    if (m) return { time: m[1], level: m[2], message: m[3] };
-                    return { time: '', level: 'INFO', message: line };
-                });
-                if (this.logAutoScroll) {
-                    this.$nextTick(() => {
-                        const c = this.$refs.logContainer;
-                        if (c) c.scrollTop = c.scrollHeight;
-                    });
-                }
-            } catch (e) { /* silent */ }
-        },
-
-        async clearLogs() {
-            try {
-                await stbService.clearLogs();
-                this.logs = [];
-                this.showToast('日志已清空');
-            } catch (e) {
-                this.showToast('清空失败', 'error');
-            }
-        },
-
-        startLogPolling() {
-            this.fetchLogs();
-            if (!this.logPollTimer) this.logPollTimer = setInterval(() => this.fetchLogs(), 2000);
         },
 
         // ---- Live Channel Management ----
@@ -822,29 +534,8 @@ const app = createApp({
             }
         },
 
-        // VOD 过滤设置（独立于 liveConfig，仅发送过滤字段，不影响直播配置）
-        async fetchVodConfig() {
-            try {
-                const config = await syncService.getVodConfig();
-                this.vodConfig.low_quality_filter_bool = config.low_quality_filter !== '0';
-                this.vodConfig.m3u8_filter_bool = config.m3u8_filter !== '0';
-            } catch (e) {
-                console.warn('获取 VOD 过滤设置失败，使用默认值', e);
-            }
-        },
 
-        async saveVodConfig() {
-            const payload = {
-                low_quality_filter: this.vodConfig.low_quality_filter_bool ? '1' : '0',
-                m3u8_filter: this.vodConfig.m3u8_filter_bool ? '1' : '0'
-            };
-            try {
-                await syncService.saveVodConfig(payload);
-                this.showToast('过滤设置已保存');
-            } catch (e) {
-                this.showToast(e.message || '网络错误', 'error');
-            }
-        },
+
 
         openCategoryModal() {
             this.showCategoryModal = true;
@@ -853,8 +544,8 @@ const app = createApp({
                 : 0;
             this.newCategory = {
                 name: '', sort_index: nextIndex,
-                color: this.presetColors[Math.floor(Math.random() * this.presetColors.length)],
-                is_visible: 1, showColorPicker: false
+                color: '#6366f1',
+                is_visible: 1
             };
             // 使用 setTimeout 确保弹窗 DOM 完全渲染后再初始化 Sortable
             setTimeout(() => { this.initCategorySortable(); }, 150);
@@ -912,7 +603,7 @@ const app = createApp({
                 const nextIdx = this.liveCategories.length > 0
                     ? Math.max(...this.liveCategories.map(c => c.sort_index)) + 1
                     : 0;
-                this.newCategory = { name: '', sort_index: nextIdx, color: '#6366f1', is_visible: 1, showColorPicker: false };
+                this.newCategory = { name: '', sort_index: nextIdx, color: '#6366f1', is_visible: 1 };
                 this.categoryTbodyKey++;
                 this.$nextTick(() => { this.initCategorySortable(); });
             } catch (e) {
@@ -1284,5 +975,13 @@ const app = createApp({
         }
     }
 });
+
+// 注册共享组件
+app.component('toast-notification', ToastNotification);
+app.component('color-picker', ColorPicker);
+app.component('sidebar-nav', SidebarNav);
+app.component('stb-tab', StbTab);
+app.component('vod-tab', VodTab);
+app.component('epg-tab', EpgTab);
 
 app.mount('#app');

@@ -512,23 +512,9 @@ body {
 }
 
 
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
 
-.checkbox-label input {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--color-primary);
-}
+
+
 
 .form-actions {
     display: flex;
@@ -727,110 +713,16 @@ body {
     padding-bottom: 10px;
 }
 
-.vod-tabs-scroll {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    overflow-x: auto;
-    flex-grow: 1;
-    padding-bottom: 2px;
-}
 
-.vod-tab-wrapper {
-    display: inline-flex;
-    align-items: center;
-    background: rgba(0, 0, 0, 0.05);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 2px 8px 2px 2px;
-    transition: all var(--transition-speed) var(--transition-ease);
-    cursor: grab;
-}
-
-.vod-tab-wrapper:active {
-    cursor: grabbing;
-}
 
 .sortable-ghost {
     opacity: 0.4 !important;
     background: var(--color-primary-hover) !important;
 }
 
-[data-theme="light"] .vod-tab-wrapper {
-    background: rgba(255, 255, 255, 0.5);
-}
 
-.vod-tab-wrapper:hover {
-    border-color: var(--border-hover);
-}
 
-.vod-tab-wrapper.active {
-    background: var(--color-success-bg);
-    border-color: var(--color-primary);
-}
 
-.vod-tab {
-    padding: 8px 12px;
-    border-radius: 10px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--font-primary);
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-    transition: color var(--transition-speed) var(--transition-ease);
-}
-
-.vod-tab-wrapper:hover .vod-tab {
-    color: var(--text-main);
-}
-
-.vod-tab-wrapper.active .vod-tab {
-    color: var(--color-primary);
-}
-
-/* Inline rename input inside the tab bar */
-.cat-rename-input {
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 2px solid var(--color-primary);
-    background: var(--bg-card);
-    color: var(--text-main);
-    font-family: var(--font-primary);
-    font-weight: 600;
-    font-size: 14px;
-    outline: none;
-    min-width: 80px;
-    max-width: 160px;
-    width: auto;
-    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
-    transition: box-shadow 0.2s ease;
-}
-
-.cat-rename-input:focus {
-    box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb), 0.25);
-}
-
-.tab-action-btn {
-    font-size: 10px;
-    cursor: pointer;
-    opacity: 0.3;
-    padding: 4px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-    user-select: none;
-}
-
-.tab-action-btn:hover {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.1);
-    transform: scale(1.1);
-}
-
-[data-theme="light"] .tab-action-btn:hover {
-    background: rgba(255, 255, 255, 0.8);
-}
 
 .btn-add-tab {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
@@ -855,30 +747,7 @@ body {
     box-shadow: 0 6px 16px rgba(var(--color-primary-rgb), 0.3);
 }
 
-.vod-editor-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    height: calc(100vh - 250px);
-    min-height: 500px;
-}
 
-@media (max-width: 960px) {
-    .vod-editor-layout {
-        grid-template-columns: 1fr;
-        height: auto;
-    }
-}
-
-.vod-panel {
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 20px;
-    overflow: hidden;
-}
 
 .panel-header {
     margin-bottom: 16px;
@@ -895,13 +764,7 @@ body {
     color: var(--text-muted);
 }
 
-/* Left panel: Catalog Tree */
-.panel-header-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-}
+
 
 .panel-header p code {
     font-family: monospace;
@@ -911,11 +774,8 @@ body {
     border-radius: 4px;
 }
 
-.refresh-progress {
-    font-weight: 700;
-    color: var(--color-primary);
-    margin-left: 4px;
-}
+
+
 
 .btn-refresh-tree {
     flex-shrink: 0;
@@ -1317,20 +1177,7 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* Modal Overlay */
-/* Modal Card (merged definition, second occurrence below adds override) */
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 12px;
-}
-
-.modal-header h3 {
-    font-size: 18px;
-    font-weight: 600;
-}
+/* 下方 modal-* 统一定义区 */
 
 .modal-header .close-btn {
     background: transparent;
@@ -1343,10 +1190,6 @@ body {
 
 .modal-header .close-btn:hover {
     opacity: 1;
-}
-
-.modal-body {
-    padding: 8px 0;
 }
 
 .delete-warning {
@@ -1366,13 +1209,7 @@ body {
     display: block;
 }
 
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    border-top: 1px solid var(--border-color);
-    padding-top: 16px;
-}
+/* modal-footer 统一定义在下方 */
 
 /* Modal fade transition */
 .fade-enter-active,
@@ -2110,20 +1947,14 @@ body {
 .inline-checkbox-group {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 4px;
 }
 
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    cursor: pointer;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+
+
+
+
 
 .category-add-inline {
     display: flex;
@@ -2676,6 +2507,12 @@ body {
 }
 
 .epg-prog-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
     border-left: 3px solid transparent;
     background: transparent;
     transition: background-color 0.2s, border-left-color 0.2s;
@@ -2763,10 +2600,6 @@ body {
     color: var(--text-muted);
 }
 
-/* --- 文本成功/失败颜色 --- */
-.text-success { color: var(--success); }
-.text-error { color: var(--color-error); }
-
 /* --- EPG 节目行 --- */
 .epg-prog-inner {
     display: flex;
@@ -2808,25 +2641,11 @@ body {
     flex-grow: 1;
     word-break: break-all;
 }
-.epg-prog-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-bottom: 6px;
-    transition: background-color 0.2s;
-}
-.epg-prog-row:hover {
-    background: rgba(255, 255, 255, 0.04);
-}
 
-/* --- 内联 checkbox group --- */
-.inline-checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+
+
+
+
 
 /* --- margin 工具类（使用 CSS 变量映射） --- */
 .mt-8  { margin-top: 8px; }
