@@ -9,7 +9,7 @@ const { createApp } = Vue;
 const app = createApp({
     data() {
         return {
-            activeTab: localStorage.getItem('active_tab') || 'stb',
+            activeTab: (() => { const t = localStorage.getItem('active_tab'); return t === 'sync' ? 'vod' : t || 'stb'; })(),
             theme: 'dark',
 
             // Toast
@@ -18,13 +18,13 @@ const app = createApp({
             // Tab info
             tabTitles: {
                 stb: '系统配置',
-                sync: '数据同步管理',
+                vod: 'VOD 点播管理',
                 live: '直播频道管理',
                 epg: 'EPG 节目管理'
             },
             tabSubtitles: {
                 stb: '管理机顶盒仿真认证凭证、定时同步任务与系统日志',
-                sync: '从 VIS API 同步点播数据到本地 SQLite 数据库',
+                vod: '从 VIS API 同步点播数据到本地 SQLite 数据库',
                 live: '管理直播频道、分类、外部导入，生成 M3U 订阅',
                 epg: '从 VIS 节目单 API 同步 EPG 数据，生成 XMLTV'
             },
@@ -168,7 +168,7 @@ const app = createApp({
                 this.fetchSchedulerConfig();
                 this.fetchSchedulerStatus();
                 this.startLogPolling();
-            } else if (newTab === 'sync') {
+            } else if (newTab === 'vod') {
                 this.startSyncStatusPolling();
             } else if (newTab === 'live') {
                 this.initLiveTab();
@@ -209,7 +209,7 @@ const app = createApp({
             this.startLogPolling();
         } else if (this.activeTab === 'live') {
             this.initLiveTab();
-        } else if (this.activeTab === 'sync') {
+        } else if (this.activeTab === 'vod') {
             this.startSyncStatusPolling();
         }
     },

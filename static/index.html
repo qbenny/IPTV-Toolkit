@@ -22,8 +22,8 @@
                 <a href="#" :class="['nav-item', { active: activeTab === 'stb' }]" @click.prevent="activeTab = 'stb'">
                     <span class="nav-icon">⚙️</span> 系统配置
                 </a>
-                <a href="#" :class="['nav-item', { active: activeTab === 'sync' }]" @click.prevent="activeTab = 'sync'">
-                    <span class="nav-icon">🔄</span> 数据同步管理
+                <a href="#" :class="['nav-item', { active: activeTab === 'vod' }]" @click.prevent="activeTab = 'vod'">
+                    <span class="nav-icon">🎬</span> VOD 点播管理
                 </a>
                 <a href="#" :class="['nav-item', { active: activeTab === 'live' }]" @click.prevent="activeTab = 'live'">
                     <span class="nav-icon">📺</span> 直播频道管理
@@ -49,7 +49,7 @@
                     <p class="header-subtitle">{{ tabSubtitles[activeTab] }}</p>
                 </div>
                 <transition name="fade-slide" mode="out-in">
-                    <div v-if="activeTab === 'sync'" class="api-links-panel" key="sync">
+                    <div v-if="activeTab === 'vod'" class="api-links-panel" key="vod">
                         <div class="api-link-item">
                             <span class="api-link-label">📦 TVBox 订阅</span>
                             <code class="api-link-url" :title="vodApiLinks.tvbox">{{ vodApiLinks.tvbox }}</code>
@@ -265,8 +265,8 @@
                 </div>
             </section>
 
-            <!-- 板块二：数据同步管理 -->
-            <section v-if="activeTab === 'sync'" class="tab-pane">
+            <!-- 板块二：VOD 点播管理 -->
+            <section v-if="activeTab === 'vod'" class="tab-pane">
                 <div class="card-grid">
                     <div class="card">
                         <div class="card-header">
