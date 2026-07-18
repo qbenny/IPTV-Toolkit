@@ -1,5 +1,5 @@
 /**
- * syncService — VOD 数据同步 / 配置 / 统计
+ * vodService — VOD 数据同步 / 配置 / 统计
  * 
  * 对应端点：
  *   POST /api/sync/start          — 启动全量 VOD 同步
@@ -8,7 +8,7 @@
  *   GET  /api/vod-config/config    — VOD 过滤设置
  *   PUT  /api/vod-config/config    — 更新 VOD 过滤设置
  */
-const syncService = {
+const vodService = {
     /* ---------- 同步控制 ---------- */
     triggerSync:  () => ApiClient.post('/api/sync/start'),
     getStatus:    () => ApiClient.get('/api/sync/status'),

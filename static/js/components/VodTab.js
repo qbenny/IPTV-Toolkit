@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VodTab — VOD 点播管理 Tab
  * 数据同步控制 / 数据库统计 / VOD过滤 / 同步说明
  * Inject: showToast, formatTime
@@ -32,7 +32,7 @@ const VodTab = {
     methods: {
         async triggerSync() {
             try {
-                const res = await syncService.triggerSync();
+                const res = await vodService.triggerSync();
                 if (res.status === 'started') { this.showToast('同步已启动'); this.startSyncStatusPolling(); }
                 else if (res.status === 'already_running') { this.showToast(res.message, 'error'); this.startSyncStatusPolling(); }
                 else this.showToast(res.message || '启动失败', 'error');
@@ -40,7 +40,7 @@ const VodTab = {
         },
         async fetchSyncStatus() {
             try {
-                this.syncStatus = await syncService.getStatus();
+                this.syncStatus = await vodService.getStatus();
                 if (!this.syncStatus.running && this.syncStatusTimer) {
                     clearInterval(this.syncStatusTimer); this.syncStatusTimer = null;
                     if (this.previousSyncRunning && this.syncStatus.last_sync_time) {
@@ -50,21 +50,21 @@ const VodTab = {
                 this.previousSyncRunning = this.syncStatus.running;
             } catch (e) { /* silent */ }
         },
-        async fetchDbStats() { try { this.dbStats = await syncService.getDbStats(); } catch (e) {} },
+        async fetchDbStats() { try { this.dbStats = await vodService.getDbStats(); } catch (e) {} },
         startSyncStatusPolling() {
             this.fetchSyncStatus(); this.fetchDbStats();
             if (!this.syncStatusTimer) this.syncStatusTimer = setInterval(() => this.fetchSyncStatus(), 2000);
         },
         async fetchVodConfig() {
             try {
-                const config = await syncService.getVodConfig();
+                const config = await vodService.getVodConfig();
                 this.vodConfig.low_quality_filter_bool = config.low_quality_filter !== '0';
                 this.vodConfig.m3u8_filter_bool = config.m3u8_filter !== '0';
             } catch (e) { console.warn('VOD配置加载失败', e); }
         },
         async saveVodConfig() {
             const payload = { low_quality_filter: this.vodConfig.low_quality_filter_bool ? '1' : '0', m3u8_filter: this.vodConfig.m3u8_filter_bool ? '1' : '0' };
-            try { await syncService.saveVodConfig(payload); this.showToast('过滤设置已保存'); }
+            try { await vodService.saveVodConfig(payload); this.showToast('过滤设置已保存'); }
             catch (e) { this.showToast(e.message || '网络错误', 'error'); }
         }
     },
