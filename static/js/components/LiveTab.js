@@ -341,8 +341,15 @@ const LiveTab = {
         handleLogoError(ch) {
             const logo = (ch.display_name || ch.name || '').trim();
             if (logo) {
-                const lower = logo.toLowerCase();
-                if (lower.includes('4k') || lower.includes('8k')) { const clean = logo.replace(/(?:\s*|-|_)?(?:4[kK]|8[kK])/g, ''); if (clean && clean !== logo) { ch.logo_url = clean; return; } }
+                const is4k = /(?:\s*|-|_)?(?:4[kK]|8[kK])/;
+                if (is4k.test(logo)) {
+                    const clean = logo.replace(is4k, '');
+                    const cleanName = clean + '.png';
+                    if (clean && logo !== clean && cleanName !== ch.logo_url) {
+                        ch.logo_url = cleanName;
+                        return;
+                    }
+                }
             }
             ch.logo_failed = true;
         },
