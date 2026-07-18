@@ -522,7 +522,6 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: block;
 }
 
 .checkbox-label input {
@@ -1112,12 +1111,7 @@ body {
     cursor: grabbing;
 }
 
-.drag-handle {
-    color: var(--text-muted);
-    font-size: 14px;
-    margin-left: 10px;
-    cursor: grab;
-}
+/* .drag-handle: 已合并到下方统一定义 */
 
 /* Right Panel: Mapping Destination List */
 .dest-panel {
@@ -1324,37 +1318,7 @@ body {
 }
 
 /* Modal Overlay */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-/* Modal Card */
-.modal-card {
-    background: var(--bg-card);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 24px;
-    width: 90%;
-    max-width: 480px;
-    box-shadow: var(--shadow-main);
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
+/* Modal Card (merged definition, second occurrence below adds override) */
 .modal-header {
     display: flex;
     align-items: center;
@@ -1890,8 +1854,11 @@ body {
 }
 
 .drag-handle {
-    cursor: move;
+    cursor: grab;
     user-select: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-left: 10px;
 }
 
 .cat-tag {
@@ -1924,7 +1891,12 @@ body {
 
 .row-actions {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap !important;
     gap: 8px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
 }
 
 .row-actions.justify-center {
@@ -1940,6 +1912,10 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     transition: background-color 0.2s;
+    white-space: nowrap !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .btn-text-primary {
@@ -2064,23 +2040,26 @@ body {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(8px);
 }
 
 .modal-card {
     background: var(--bg-sidebar);
     border: 1px solid var(--border-color);
+    border-radius: 16px;
     width: 100%;
     max-width: 480px;
-    border-radius: 16px;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
-    max-height: 90vh;
     box-shadow: var(--shadow-main);
+    padding: 24px;
+    gap: 20px;
 }
 
 .modal-card.modal-large {
@@ -2144,7 +2123,6 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: block;
 }
 
 .category-add-inline {
@@ -2509,23 +2487,6 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.row-actions {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap !important;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-}
-
-.btn-text {
-    white-space: nowrap !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
 .sortable-batch-ghost {
     opacity: 0.35 !important;
     background: rgba(var(--color-primary-rgb), 0.15) !important;
@@ -2749,6 +2710,143 @@ body {
         box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
     }
 }
+
+
+/* ==========================================
+ * Phase 0a: 工具类 & 内联样式提取
+ * ========================================== */
+
+/* --- 宽度 --- */
+.w-full { width: 100%; }
+
+/* --- 显示/隐藏 --- */
+.hidden { display: none !important; }
+
+/* --- 文本对齐 --- */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+/* --- 溢出截断 --- */
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- 字体大小 --- */
+.text-xs { font-size: 12px; }
+.text-sm { font-size: 13px; }
+
+/* --- 表格固定宽度 --- */
+.cell-sm { width: 40px; text-align: center; }
+
+/* --- 按钮 compact --- */
+.btn-xs {
+    padding: 4px 10px !important;
+    font-size: 12px;
+}
+
+/* --- 清除按钮（文件上传旁） --- */
+.btn-clear {
+    background: none;
+    border: none;
+    color: var(--color-error);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+/* --- 空状态提示 --- */
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+}
+
+/* --- 文本成功/失败颜色 --- */
+.text-success { color: var(--success); }
+.text-error { color: var(--color-error); }
+
+/* --- EPG 节目行 --- */
+.epg-prog-inner {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+.epg-prog-time-col {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 165px;
+    flex-shrink: 0;
+}
+.epg-time {
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-secondary);
+}
+.epg-badge-playing {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
+    font-weight: 600;
+    font-size: 10px;
+    padding: 1px 6px;
+    animation: pulse-green 2s infinite;
+    white-space: nowrap;
+    display: inline-block;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+}
+.epg-prog-title {
+    font-size: 13px;
+    color: var(--text-main);
+    font-weight: 500;
+    text-align: left;
+    flex-grow: 1;
+    word-break: break-all;
+}
+.epg-prog-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    transition: background-color 0.2s;
+}
+.epg-prog-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* --- 内联 checkbox group --- */
+.inline-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* --- margin 工具类（使用 CSS 变量映射） --- */
+.mt-8  { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.mt-15 { margin-top: 15px; }
+.mt-16 { margin-top: 16px; }
+.mt-20 { margin-top: 20px; }
+.mt-24 { margin-top: 24px; }
+
+.mb-8  { margin-bottom: 8px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-15 { margin-bottom: 15px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+
+/* --- spacer（水平弹性间距）--- */
+.spacer { flex: 1; }
+
 
 
 

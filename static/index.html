@@ -176,7 +176,7 @@
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-primary" @click="saveStbConfig" :disabled="savingStb" style="width: 100%;">
+                            <button class="btn btn-primary w-full" @click="saveStbConfig" :disabled="savingStb">
                                 <span class="spinner" v-if="savingStb"></span>
                                 {{ savingStb ? '正在保存并验证...' : '💾 保存配置并测试登录' }}
                             </button>
@@ -235,7 +235,7 @@
                 </div>
 
                 <!-- 系统运行日志 -->
-                <div class="card log-card" style="margin-top: 16px;">
+                <div class="card log-card mt-16">
                     <div class="card-header">
                         <div class="header-left">
                             <h3>系统运行日志</h3>
@@ -272,7 +272,7 @@
                         <div class="card-header">
                             <h3>数据同步控制</h3>
                         </div>
-                        <div class="status-list" style="margin-top: 15px;">
+                        <div class="status-list mt-15">
                             <div class="status-item">
                                 <span class="status-label">同步状态</span>
                                 <span :class="['status-val', syncStatus.running ? 'text-warning' : 'text-success']">
@@ -292,8 +292,8 @@
                                 <span class="status-val text-error">{{ syncStatus.last_error }}</span>
                             </div>
                         </div>
-                        <div class="form-actions" style="margin-top: 20px;">
-                            <button class="btn btn-primary" @click="triggerSync" :disabled="syncStatus.running" style="width: 100%;">
+                        <div class="form-actions mt-20">
+                            <button class="btn btn-primary w-full" @click="triggerSync" :disabled="syncStatus.running">
                                 {{ syncStatus.running ? '⏳ 同步中...' : '🔄 开始全量同步' }}
                             </button>
                         </div>
@@ -303,7 +303,7 @@
                         <div class="card-header">
                             <h3>数据库统计</h3>
                         </div>
-                        <div class="status-list" style="margin-top: 15px;">
+                        <div class="status-list mt-15">
                             <div class="status-item">
                                 <span class="status-label">总条目数</span>
                                 <span class="status-val highlight">{{ dbStats.total }}</span>
@@ -313,19 +313,19 @@
                                 <span class="status-val">{{ count }} 条</span>
                             </div>
                             <div v-if="dbStats.total === 0" class="status-item">
-                                <span class="status-label" style="color: var(--text-muted);">数据库为空，请先执行同步</span>
+                                <span class="status-label">数据库为空，请先执行同步</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="card" style="margin-top: 20px;">
+                <div class="card mt-20">
                     <div class="card-header">
                         <h3>VOD 过滤设置</h3>
                     </div>
-                    <div class="status-list" style="margin-top: 15px;">
+                    <div class="status-list mt-15">
 
-                        <div class="form-group inline-checkbox-group" style="margin-bottom: 15px;">
+                        <div class="form-group inline-checkbox-group mb-15">
                             <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="vodConfig.low_quality_filter_bool">
@@ -336,7 +336,7 @@
                             <small class="form-help text-muted">屏蔽 电视剧/综艺 的 ep=0&sc=0 垃圾，纪录 无海报垃圾。电影/少儿/动漫 不受影响。重启 TVBox 生效。</small>
                         </div>
 
-                        <div class="form-group inline-checkbox-group" style="margin-bottom: 10px;">
+                        <div class="form-group inline-checkbox-group mb-10">
                             <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="vodConfig.m3u8_filter_bool">
@@ -347,18 +347,18 @@
                             <small class="form-help text-muted">屏蔽 JHT/YANHUA/YANKUM 三个池（~1645 条，格式不兼容）。重启 TVBox 生效。</small>
                         </div>
 
-                        <div class="form-actions" style="margin-top: 15px;">
-                            <button class="btn btn-primary" @click="saveVodConfig" style="width: 100%;">💾 保存过滤设置</button>
+                        <div class="form-actions mt-15">
+                            <button class="btn btn-primary w-full" @click="saveVodConfig">💾 保存过滤设置</button>
                         </div>
 
                     </div>
                 </div>
 
-                <div class="card" style="margin-top: 20px;">
+                <div class="card mt-20">
                     <div class="card-header">
                         <h3>同步说明</h3>
                     </div>
-                    <div class="status-list" style="margin-top: 10px;">
+                    <div class="status-list mt-10">
                         <p class="status-desc">
                             📥 数据来源：VIS API <code>api/search/filter.json</code><br>
                             📊 同步类型：电视剧、电影、综艺、动漫、少儿<br>
@@ -380,26 +380,26 @@
                         </div>
                         <div class="import-panel-content">
                             <div class="import-options">
-                                <div class="import-tabs" style="margin-top: 0;">
+                                <div class="import-tabs">
                                     <button :class="['import-tab-btn', { active: importMethod === 'text' }]" @click="importMethod = 'text'">🔗 URL / 文本</button>
                                     <button :class="['import-tab-btn', { active: importMethod === 'file' }]" @click="importMethod = 'file'">📁 上传文件</button>
                                 </div>
-                                <div class="form-actions" style="margin-top: 15px;">
-                                    <button class="btn btn-primary" @click="importExternalChannels" :disabled="importingChannels" style="width: 100%;">
+                                <div class="form-actions mt-15">
+                                    <button class="btn btn-primary w-full" @click="importExternalChannels" :disabled="importingChannels">
                                         <span class="spinner" v-if="importingChannels"></span>
                                         {{ importingChannels ? '导入中...' : '📥 开始导入' }}
                                     </button>
                                 </div>
                             </div>
                             <div class="import-area">
-                                <div v-if="importMethod === 'text'" style="width: 100%;">
+                                <div v-if="importMethod === 'text'" class="w-full">
                                     <textarea v-model="importText" placeholder="在此粘贴 M3U 订阅链接或 M3U 文本内容..." rows="4" class="import-textarea"></textarea>
                                 </div>
-                                <div v-else style="width: 100%;">
+                                <div v-else class="w-full">
                                     <div class="file-upload-zone" @dragover.prevent @drop.prevent="handleImportFileDrop">
                                         <span class="upload-icon">📥</span>
-                                        <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label">选择文件<input type="file" @change="handleImportFileSelect" accept=".m3u,.m3u8" style="display:none;"></label></p>
-                                        <p v-else class="text-success" style="font-size: 12px;">已选择文件: <strong>{{ importFile.name }}</strong> <button class="btn-clear-file" @click="importFile = null" style="background:none; border:none; color:var(--color-error); cursor:pointer; font-size:12px;">[清除]</button></p>
+                                        <p v-if="!importFile">拖拽文件到此处，或 <label class="file-label">选择文件<input type="file" @change="handleImportFileSelect" accept=".m3u,.m3u8" class="hidden"></label></p>
+                                        <p v-else class="text-success text-xs">已选择文件: <strong>{{ importFile.name }}</strong> <button class="btn-clear" @click="importFile = null">[清除]</button></p>
                                     </div>
                                 </div>
                             </div>
@@ -502,13 +502,13 @@
                             <table class="live-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40px; text-align: center;">
+                                        <th class="cell-sm">
                                             <input type="checkbox" v-model="selectAllChannels" @change="toggleSelectAll">
                                         </th>
-                                        <th style="width: 40px; text-align: center;">启用</th>
-                                        <th style="width: 40px; text-align: center;">排序</th>
+                                        <th class="cell-sm">启用</th>
+                                        <th class="cell-sm">排序</th>
                                         <th style="width: 100px;">序号 / ID</th>
-                                        <th style="width: 50px; text-align: center;">台标</th>
+                                        <th class="cell-sm">台标</th>
                                         <th style="width: 150px;">原名</th>
                                         <th style="width: 200px;">别名</th>
                                         <th style="width: 90px;">所属分类</th>
@@ -940,35 +940,34 @@
                     <div class="modal-body" style="padding-top: 10px; display: flex; flex-direction: column; gap: 15px;">
                         <!-- 日期导航翻页条 -->
                         <div class="epg-date-nav">
-                            <button class="btn btn-secondary btn-sm" :disabled="epgPreviewDateIndex === 0" @click="prevEpgDay" style="padding: 4px 10px !important;">◀</button>
+                            <button class="btn btn-secondary btn-xs" :disabled="epgPreviewDateIndex === 0" @click="prevEpgDay">◀</button>
                             <span style="font-size: 14px; font-weight: 600; color: var(--text-main);">{{ epgFormattedDate }}</span>
-                            <button class="btn btn-secondary btn-sm" :disabled="epgPreviewDateIndex === epgPreviewDates.length - 1" @click="nextEpgDay" style="padding: 4px 10px !important;">▶</button>
+                            <button class="btn btn-secondary btn-xs" :disabled="epgPreviewDateIndex === epgPreviewDates.length - 1" @click="nextEpgDay">▶</button>
                         </div>
 
                         <!-- 节目单列表容器 -->
                         <div class="epg-program-list" ref="epgProgramList">
-                            <div v-if="epgLoading" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <div v-if="epgLoading" class="empty-state">
                                 <span class="spinner" style="margin-right: 8px; vertical-align: middle;"></span>
                                 正在加载节目单数据...
                             </div>
-                            <div v-else-if="epgPrograms.length === 0" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <div v-else-if="epgPrograms.length === 0" class="empty-state">
                                 暂无该日期的节目单数据 📺
                             </div>
                             <div v-else>
                                 <div v-for="prog in epgPrograms" :key="prog.id" 
                                      :class="['epg-prog-row', { 'is-playing': isProgramPlaying(prog) }]"
-                                     ref="epgRows"
-                                     style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; transition: background-color 0.2s;">
-                                    <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
+                                     ref="epgRows">
+                                    <div class="epg-prog-inner">
                                         <!-- 左侧时间与状态 -->
-                                        <div style="display: flex; align-items: center; gap: 8px; min-width: 165px; flex-shrink: 0;">
-                                            <span class="epg-time" style="font-family: monospace; font-size: 13px; font-weight: 600; color: var(--color-secondary);">
+                                        <div class="epg-prog-time-col">
+                                            <span class="epg-time">
                                                 {{ formatProgTimeRange(prog) }}
                                             </span>
-                                            <span v-if="isProgramPlaying(prog)" class="channel-tag" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3); font-weight: 600; font-size: 10px; padding: 1px 6px; animation: pulse-green 2s infinite; white-space: nowrap;" title="当前正在直播的节目">🟢 正在播放</span>
+                                            <span v-if="isProgramPlaying(prog)" class="epg-badge-playing" title="当前正在直播的节目">🟢 正在播放</span>
                                         </div>
                                         <!-- 右侧节目名称 -->
-                                        <span class="epg-title" style="font-size: 13px; color: var(--text-main); font-weight: 500; text-align: left; flex-grow: 1; word-break: break-all;">
+                                        <span class="epg-prog-title">
                                             {{ prog.title }}
                                         </span>
                                     </div>
@@ -980,13 +979,14 @@
             </div>
         </transition>
 
-        <input type="file" ref="aliasFileInput" accept=".json" @change="handleAliasFileImport" style="display:none;">
-        <input type="file" ref="categoryMappingFileInput" accept=".json" @change="handleCategoryMappingFileImport" style="display:none;">
+        <input type="file" ref="aliasFileInput" accept=".json" @change="handleAliasFileImport" class="hidden">
+        <input type="file" ref="categoryMappingFileInput" accept=".json" @change="handleCategoryMappingFileImport" class="hidden">
 
         </main>
     </div>
 
     <script src="js/Sortable.min.js"></script>
+    <script src="js/api/client.js"></script>
     <script src="js/app.js?v=2.0"></script>
 </body>
 </html>
