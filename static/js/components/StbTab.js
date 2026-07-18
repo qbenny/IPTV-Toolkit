@@ -384,7 +384,7 @@ const StbTab = {
                     <h3>系统运行日志</h3>
                 </div>
                 <div class="log-actions">
-                    <select v-model="logLevelFilter" class="log-select">
+                    <select v-model="logLevelFilter">
                         <option value="ALL">全部日志 (ALL)</option>
                         <option value="DEBUG">调试 (DEBUG及以上)</option>
                         <option value="INFO">信息 (INFO及以上)</option>

@@ -236,6 +236,23 @@ body {
 }
 
 /* Form Styles */
+select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 8px 12px;
+    border-radius: 8px;
+    outline: none;
+    font-family: var(--font-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--ring-focus);
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -353,20 +370,7 @@ body {
     flex-wrap: wrap;
 }
 
-.hour-select {
-    flex: 0 0 auto;
-    min-width: 130px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-input);
-    color: var(--text-main);
-    font-family: var(--font-primary);
-    font-size: 13px;
-    outline: none;
-    cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
-}
+.hour-select { flex: 0 0 auto; min-width: 130px; font-size: 13px; transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s; }
 .hour-select:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .task-status {
@@ -641,22 +645,6 @@ body {
     gap: 12px;
 }
 
-.log-select {
-    background: var(--bg-sidebar);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    outline: none;
-    cursor: pointer;
-    transition: border-color var(--transition-speed);
-}
-
-.filter-group select:focus,
-.log-select:focus,
-.batch-cat-select:focus,
-
 .btn-sm {
     padding: 6px 12px !important;
     font-size: 13px !important;
@@ -907,17 +895,7 @@ body {
     font-weight: 600;
 }
 
-.filter-group select {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    padding: 8px 12px;
-    border-radius: 8px;
-    outline: none;
-    font-size: 13px;
-    min-width: 120px;
-    transition: border-color 0.2s;
-}
+.filter-group select { min-width: 120px; }
 
 .search-group {
     flex-direction: row;
@@ -1460,31 +1438,8 @@ body {
     gap: 12px;
 }
 
-.batch-cat-select {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    padding: 6px 12px;
-    border-radius: 6px;
-    outline: none;
-    font-size: 12px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-}
-
-.cat-select {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    padding: 4px 8px;
-    border-radius: 6px;
-    outline: none;
-    font-size: 12px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-    min-width: 80px;
-    max-width: 110px;
-}
+.batch-cat-select { padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+.cat-select { padding: 4px 8px; border-radius: 6px; font-size: 12px; min-width: 80px; max-width: 110px; }
 
 .channel-name-cell {
     font-size: 12px;

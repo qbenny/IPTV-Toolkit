@@ -47,7 +47,7 @@
     --scroll-thumb-hover: #334155;
 
     /* 控件背景 */
-    --bg-input: rgba(0, 0, 0, 0.2);
+    --bg-input: #111827;
     --bg-input-dim: rgba(0, 0, 0, 0.1);
     --bg-hover: rgba(255, 255, 255, 0.05);
     --ring-focus: rgba(var(--color-primary-rgb), 0.15);
