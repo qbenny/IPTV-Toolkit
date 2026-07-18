@@ -2550,6 +2550,14 @@ body {
         flex-direction: column;
         gap: 16px;
     }
+
+    /* 状态列表在移动端强制单列，避免撑大卡片宽度 */
+    .status-list.status-grid-2 {
+        grid-template-columns: 1fr !important;
+    }
+    .status-list.status-grid-2 .status-item.full {
+        grid-column: 1 !important;
+    }
     .brand {
         margin-bottom: 12px;
         justify-content: center;
@@ -2657,6 +2665,24 @@ body {
     .table-container {
         overflow-x: auto;
         width: 100%;
+    }
+
+    /* API links panel: stack vertically on mobile */
+    .api-links-panel {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100%;
+    }
+    .api-link-item {
+        width: 100%;
+    }
+    .api-link-item .api-link-url {
+        max-width: none;
+        flex: 1;
+    }
+    .api-link-item .api-copy-btn {
+        margin-left: auto;
+        flex-shrink: 0;
     }
 }
 
