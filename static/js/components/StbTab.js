@@ -211,28 +211,6 @@ const StbTab = {
             return token.substring(0, 6) + '••••••••' + token.substring(token.length - 6);
         },
 
-        async copyToClipboard(text) {
-            try {
-                if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                    this.showToast('已复制到剪贴板');
-                    return;
-                }
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed'; ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                try {
-                    ta.select();
-                    document.execCommand('copy');
-                    this.showToast('已复制到剪贴板');
-                } finally {
-                    document.body.removeChild(ta);
-                }
-            } catch (e) {
-                this.showToast('复制失败', 'error');
-            }
-        }
     },
 
     template: `<!-- ↓↓ 由 app.js 中提取的 StbTab template ↓↓ -->
@@ -358,7 +336,7 @@ const StbTab = {
                         <span class="status-label">JSESSIONID</span>
                         <span class="status-val token-val" v-if="simStatus.jsessionid" :title="simStatus.jsessionid">
                             <span class="token-text">{{ maskToken(simStatus.jsessionid) }}</span>
-                            <button class="copy-btn" @click="copyToClipboard(simStatus.jsessionid)" title="复制">📋</button>
+                            <button class="copy-btn" @click="copyToClipboard(simStatus.jsessionid, showToast)" title="复制">📋</button>
                         </span>
                         <span class="status-val text-muted" v-else>—</span>
                     </div>
@@ -366,7 +344,7 @@ const StbTab = {
                         <span class="status-label">UserToken</span>
                         <span class="status-val token-val" v-if="simStatus.user_token" :title="simStatus.user_token">
                             <span class="token-text">{{ maskToken(simStatus.user_token) }}</span>
-                            <button class="copy-btn" @click="copyToClipboard(simStatus.user_token)" title="复制">📋</button>
+                            <button class="copy-btn" @click="copyToClipboard(simStatus.user_token, showToast)" title="复制">📋</button>
                         </span>
                         <span class="status-val text-muted" v-else>—</span>
                     </div>

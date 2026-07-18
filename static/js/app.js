@@ -127,6 +127,7 @@ const app = createApp({
 });
 
 // 注册所有组件
+app.config.globalProperties.copyToClipboard = window.copyToClipboard;
 app.component('toast-notification', ToastNotification);
 app.component('color-picker', ColorPicker);
 app.component('sidebar-nav', SidebarNav);

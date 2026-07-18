@@ -28,26 +28,26 @@
                         <div class="api-link-item">
                             <span class="api-link-label">📦 TVBox 订阅</span>
                             <code class="api-link-url" :title="vodApiLinks.tvbox">{{ vodApiLinks.tvbox }}</code>
-                            <button class="api-copy-btn" @click="copyToClipboard(vodApiLinks.tvbox)" title="复制 TVBox 订阅链接">📋</button>
+                            <button class="api-copy-btn" @click="copyToClipboard(vodApiLinks.tvbox, showToast)" title="复制 TVBox 订阅链接">📋</button>
                         </div>
                         <div class="api-link-item">
                             <span class="api-link-label">🔗 VOD API</span>
                             <code class="api-link-url" :title="vodApiLinks.api">{{ vodApiLinks.api }}</code>
-                            <button class="api-copy-btn" @click="copyToClipboard(vodApiLinks.api)" title="复制 VOD API 链接">📋</button>
+                            <button class="api-copy-btn" @click="copyToClipboard(vodApiLinks.api, showToast)" title="复制 VOD API 链接">📋</button>
                         </div>
                     </div>
                     <div v-else-if="activeTab === 'live'" class="api-links-panel" key="live">
                         <div class="api-link-item">
                             <span class="api-link-label">📺 M3U 订阅链接</span>
                             <code class="api-link-url" :title="liveM3uUrl">{{ liveM3uUrl }}</code>
-                            <button class="api-copy-btn" @click="copyToClipboard(liveM3uUrl)" title="复制 M3U 订阅链接">📋</button>
+                            <button class="api-copy-btn" @click="copyToClipboard(liveM3uUrl, showToast)" title="复制 M3U 订阅链接">📋</button>
                         </div>
                     </div>
                     <div v-else-if="activeTab === 'epg'" class="api-links-panel" key="epg">
                         <div class="api-link-item">
                             <span class="api-link-label">📅 EPG 地址</span>
                             <code class="api-link-url" :title="epgXmlLink">{{ epgXmlLink }}</code>
-                            <button class="api-copy-btn" @click="copyToClipboard(epgXmlLink)" title="复制 EPG 地址">📋</button>
+                            <button class="api-copy-btn" @click="copyToClipboard(epgXmlLink, showToast)" title="复制 EPG 地址">📋</button>
                         </div>
                     </div>
                 </transition>
@@ -76,6 +76,7 @@
     <script src="js/api/vodService.js"></script>
     <script src="js/api/epgService.js"></script>
     <script src="js/api/liveService.js"></script>
+    <script src="js/components/shared/clipboard.js"></script>
     <script src="js/components/shared/ToastNotification.js"></script>
     <script src="js/components/shared/ColorPicker.js"></script>
     <script src="js/components/shared/SidebarNav.js"></script>
@@ -83,6 +84,6 @@
     <script src="js/components/VodTab.js"></script>
     <script src="js/components/EpgTab.js"></script>
     <script src="js/components/LiveTab.js"></script>
-    <script src="js/app.js?v=2.0"></script>
+    <script src="js/app.js?v=2.1"></script>
 </body>
 </html>
