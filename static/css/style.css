@@ -3,6 +3,19 @@
 * (CSS 变量已在 tokens.css 中定义)
 *--------------------------------------------------------------- */
 
+/* ============================================================
+ * 目录 (Table of Contents)
+ *   1. Reset & Base      — 全局重置、body、滚动条、#app
+ *   2. Layout            — Sidebar / Main Content
+ *   3. Components        — Card / Form / Button / Status / Toast /
+ *                          Modal / Switch / Log / Table / Batch
+ *   4. Pages             — Live / EPG 等页面级样式
+ *   5. Utilities         — 工具类（宽度/显隐/溢出/margin…）
+ *   6. Responsive        — 全部 @media 断点（已归并至此）
+ * 说明：本文件为单文件组织，拆分方案见 web-ui-refactoring-spec.md。
+ * ============================================================ */
+
+/* 1. Reset & Base */
 * {
     margin: 0;
     padding: 0;
@@ -47,6 +60,7 @@ body {
     min-height: 100vh;
 }
 
+/* 2. Layout */
 /* Sidebar Styling */
 .sidebar {
     width: 280px;
@@ -177,6 +191,7 @@ body {
     font-size: 15px;
 }
 
+/* 3. Components */
 /* Cards & Layouts */
 .card-grid {
     display: grid;
@@ -187,12 +202,6 @@ body {
 .left-col { display: flex; flex-direction: column; gap: 16px; }
 .card-grid.cols-3 {
     grid-template-columns: 1fr 1fr 1fr;
-}
-
-@media (max-width: 1024px) {
-    .card-grid, .card-grid.cols-3 {
-        grid-template-columns: 1fr;
-    }
 }
 
 .card {
@@ -259,12 +268,6 @@ select:focus {
     gap: 20px;
 }
 
-@media (max-width: 640px) {
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 .form-group {
     display: flex;
     flex-direction: column;
@@ -298,6 +301,83 @@ select:focus {
 .form-group input:focus {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--ring-focus);
+}
+
+/* Import Form Elements */
+.import-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.import-tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 8px 0;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.import-tab-btn.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    font-weight: 600;
+}
+
+.import-textarea {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 12px;
+    outline: none;
+    font-size: 12px;
+    font-family: monospace;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.import-textarea:focus {
+    border-color: var(--color-primary);
+}
+
+.file-upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    transition: border-color 0.2s;
+    background: var(--bg-hover);
+}
+
+.file-upload-zone:hover {
+    border-color: var(--color-primary);
+}
+
+.upload-icon {
+    font-size: 28px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.file-upload-zone p {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.file-label {
+    color: var(--color-primary);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.file-label:hover {
+    text-decoration: underline;
 }
 
 /* ===== 定时自动同步管理卡片 ===== */
@@ -925,6 +1005,7 @@ select:focus {
     min-width: 0;
 }
 
+/* 4. Pages */
 /* Live Channel Table Customizations */
 .live-table {
     width: 100%;
@@ -1032,82 +1113,7 @@ select:focus {
     background: var(--color-error-bg);
 }
 
-/* Import Form Elements */
-.import-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border-color);
-}
 
-.import-tab-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    padding: 8px 0;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-}
-
-.import-tab-btn.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-    font-weight: 600;
-}
-
-.import-textarea {
-    width: 100%;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    border-radius: 8px;
-    padding: 12px;
-    outline: none;
-    font-size: 12px;
-    font-family: monospace;
-    resize: vertical;
-    transition: border-color 0.2s;
-}
-
-.import-textarea:focus {
-    border-color: var(--color-primary);
-}
-
-.file-upload-zone {
-    border: 2px dashed var(--border-color);
-    border-radius: 12px;
-    padding: 24px 16px;
-    text-align: center;
-    transition: border-color 0.2s;
-    background: var(--bg-hover);
-}
-
-.file-upload-zone:hover {
-    border-color: var(--color-primary);
-}
-
-.upload-icon {
-    font-size: 28px;
-    display: block;
-    margin-bottom: 8px;
-}
-
-.file-upload-zone p {
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
-.file-label {
-    color: var(--color-primary);
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.file-label:hover {
-    text-decoration: underline;
-}
 
 /* Modals Custom Styles */
 .modal-overlay {
@@ -1351,6 +1357,59 @@ select:focus {
     padding: 8px 16px;
 }
 
+/* EPG Preview Modal Styles */
+.epg-date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--epg-date-nav-bg);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: 10px;
+}
+
+.epg-program-list {
+    max-height: 380px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-input);
+    padding: 8px;
+}
+
+.epg-prog-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border-left: 3px solid transparent;
+    background: transparent;
+    transition: background-color 0.2s, border-left-color 0.2s;
+}
+
+.epg-prog-row:hover {
+    background: var(--bg-hover);
+}
+
+.epg-prog-row.is-playing {
+    background: var(--epg-playing-bg) !important;
+    border-left-color: var(--epg-playing-border) !important;
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
 /* Slider Switch Toggle */
 .switch-toggle {
     position: relative;
@@ -1478,6 +1537,19 @@ select:focus {
     background: var(--ring-focus) !important;
     border: 1px dashed var(--color-primary) !important;
     transition: opacity 0.2s, background-color 0.2s;
+}
+
+/* 6. Responsive (consolidated) */
+@media (max-width: 1024px) {
+    .card-grid, .card-grid.cols-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1631,59 +1703,9 @@ select:focus {
     }
 }
 
-/* EPG Preview Modal Styles */
-.epg-date-nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--epg-date-nav-bg);
-    border: 1px solid var(--border-color);
-    padding: 8px 16px;
-    border-radius: 10px;
-}
 
-.epg-program-list {
-    max-height: 380px;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--bg-input);
-    padding: 8px;
-}
 
-.epg-prog-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-bottom: 6px;
-    border-left: 3px solid transparent;
-    background: transparent;
-    transition: background-color 0.2s, border-left-color 0.2s;
-}
-
-.epg-prog-row:hover {
-    background: var(--bg-hover);
-}
-
-.epg-prog-row.is-playing {
-    background: var(--epg-playing-bg) !important;
-    border-left-color: var(--epg-playing-border) !important;
-}
-
-@keyframes pulse-green {
-    0% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-    }
-    70% {
-        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    }
-}
-
+/* 5. Utilities */
 /* ==========================================
  * Phase 0a: 工具类 & 内联样式提取
  * ========================================== */
