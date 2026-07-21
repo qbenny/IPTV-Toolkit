@@ -498,13 +498,13 @@ const LiveTab = {
                     <th class="col-tight"><input type="checkbox" id="select-all" name="select_all" v-model="selectAllChannels" @change="toggleSelectAll"></th><th class="col-tight">启用</th><th class="col-tight">排序</th><th class="w-100">序号 / ID</th><th>台标</th><th class="w-150">原名</th><th class="w-200">别名</th><th class="w-90">所属分类</th><th>组播地址</th><th>单播地址</th><th class="w-120">操作</th>
                 </tr></thead>
                 <tbody id="live-channel-list-tbody" :key="tbodyKey">
-                    <tr v-if="liveChannels.length === 0"><td colspan="11" class="empty-row pad-30">暂无满足条件的频道数据，请尝试同步或手动导入</td></tr>
+                    <tr v-if="liveChannels.length === 0"><td colspan="11" class="empty-row">暂无满足条件的频道数据，请尝试同步或手动导入</td></tr>
                     <tr v-for="ch in liveChannels" :key="ch.id" :data-id="ch.id" class="live-channel-row">
                         <td class="col-tight"><input type="checkbox" :name="'ch_select_' + ch.id" :value="ch.id" v-model="selectedChannelIds"></td>
                         <td class="col-tight"><label class="switch-toggle"><input type="checkbox" :name="'ch_enabled_' + ch.id" :checked="ch.is_enabled === 1" @change="toggleChannelEnabled(ch)"><span class="switch-slider"></span></label></td>
                         <td class="drag-handle col-tight"><span>☰</span></td>
-                        <td class="nowrap"><span class="text-secondary fw-600" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span><span class="text-muted hint-sm" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span></td>
-                        <td class="pad-4"><img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" class="channel-logo" @error="handleLogoError(ch)"><span v-else class="fs-14-muted">📺</span></td>
+                        <td class="nowrap"><span class="text-secondary fw-600" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span><span class="text-muted fs-11" style="margin-left:8px" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span></td>
+                        <td><img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" class="channel-logo" @error="handleLogoError(ch)"><span v-else class="fs-14 text-muted">📺</span></td>
                         <td class="nowrap"><span class="channel-name-cell clickable" :title="'点击添加别名映射: ' + ch.name" @click="quickAddAlias(ch.name)">{{ ch.name }}</span></td>
                         <td class="nowrap"><span class="channel-name-cell">{{ ch.display_name || ch.name }}</span><span v-if="ch.source === 'external'" class="channel-tag tag-primary">外部</span><span v-if="ch.timeshift_enabled === 1" class="channel-tag tag-green" :title="'支持时移回看，回看时长共 ' + (ch.back_time || 0) + ' 天'">回看: {{ ch.back_time || 0 }}天</span><span v-if="ch.epg_days && ch.epg_days > 0" class="channel-tag tag-blue" :title="'点击预览 EPG 节目单 (当前共 ' + ch.epg_days + ' 天)'" @click="openEpgPreview(ch)">EPG: {{ ch.epg_days }}天</span><span v-else class="channel-tag tag-slate" title="暂无可用 EPG 数据">无EPG</span></td>
                         <td><select :name="'ch_cat_' + ch.id" class="cat-select" v-model="ch.category_id" @change="changeChannelCategory(ch)" :style="{ borderLeft: '4px solid ' + (ch.category_color || 'var(--border-color)') }"><option :value="0">未分类</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></td>
@@ -530,12 +530,12 @@ const LiveTab = {
                     <div class="modal-body col-stack">
                         <div class="epg-date-nav">
                             <button class="btn btn-secondary btn-xs" :disabled="epgPreviewDateIndex === 0" @click="prevEpgDay">◀</button>
-                            <span class="fs-14-fw600">{{ epgFormattedDate }}</span>
+                            <span class="fs-14 fw-600">{{ epgFormattedDate }}</span>
                             <button class="btn btn-secondary btn-xs" :disabled="epgPreviewDateIndex === epgPreviewDates.length - 1" @click="nextEpgDay">▶</button>
                         </div>
                         <div class="epg-program-list" ref="epgProgramList">
                             <div v-if="epgLoading" class="empty-state">
-                                <span class="spinner mr-8-vmid"></span>
+                                <span class="spinner"></span>
                                 正在加载节目单数据...
                             </div>
                             <div v-else-if="epgPrograms.length === 0" class="empty-state">
@@ -569,7 +569,7 @@ const LiveTab = {
                         <button class="modal-close" @click="showLiveConfigModal = false">×</button>
                     </div>
                     <div class="modal-body">
-                        <div class="form-group inline-checkbox-group mt-10 mb-15">
+                        <div class="form-group inline-checkbox-group mt-15 mb-15">
                             <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.udpxy_enabled_bool">
@@ -577,7 +577,7 @@ const LiveTab = {
                                 </label>
                                 <span class="switch-label-text">🔗 启用 UDPXY 组播代理模式</span>
                             </div>
-                            <small class="form-help text-muted">开启后，igmp:// 组播头会被自动转换成 udpxy 的 http:// 代理格式；关闭则保持原始 igmp:// 连接。</small>
+                            <small class="status-desc">开启后，igmp:// 组播头会被自动转换成 udpxy 的 http:// 代理格式；关闭则保持原始 igmp:// 连接。</small>
                         </div>
                         <div class="form-group inline-checkbox-group mb-15-fade" :style="{ opacity: liveConfig.udpxy_enabled_bool ? 1 : 0.5, pointerEvents: liveConfig.udpxy_enabled_bool ? 'auto' : 'none' }">
                             <div class="switch-item">
@@ -587,7 +587,7 @@ const LiveTab = {
                                 </label>
                                 <span class="switch-label-text">⚡ 启用全局 FCC 加速</span>
                             </div>
-                            <small class="form-help text-muted">开启后，若频道支持 FCC，则在 udpxy 转换链接后追加 ?fcc= 提速参数。仅在 UDPXY 模式开启时有效。</small>
+                            <small class="status-desc">开启后，若频道支持 FCC，则在 udpxy 转换链接后追加 ?fcc= 提速参数。仅在 UDPXY 模式开启时有效。</small>
                         </div>
                         <div class="form-group inline-checkbox-group mb-15">
                             <div class="switch-item">
@@ -597,9 +597,9 @@ const LiveTab = {
                                 </label>
                                 <span class="switch-label-text">🕒 启用全局时移回看 (Catchup)</span>
                             </div>
-                            <small class="form-help text-muted">开启后，对支持时移的频道生成 catchup="default" 时移元数据。</small>
+                            <small class="status-desc">开启后，对支持时移的频道生成 catchup="default" 时移元数据。</small>
                         </div>
-                        <div class="form-group inline-checkbox-group mb-20">
+                        <div class="form-group inline-checkbox-group mb-15">
                             <div class="switch-item">
                                 <label class="switch-toggle">
                                     <input type="checkbox" v-model="liveConfig.m3u_dual_line_bool">
@@ -607,17 +607,17 @@ const LiveTab = {
                                 </label>
                                 <span class="switch-label-text">🛤️ 启用组播+单播双线模式</span>
                             </div>
-                            <small class="form-help text-muted">开启后，同一频道将同时生成 udpxy 组播和 RTSP 单播两行数据。</small>
+                            <small class="status-desc">开启后，同一频道将同时生成 udpxy 组播和 RTSP 单播两行数据。</small>
                         </div>
                         <div class="form-group mb-15-fade" :style="{ opacity: liveConfig.udpxy_enabled_bool ? 1 : 0.5, pointerEvents: liveConfig.udpxy_enabled_bool ? 'auto' : 'none' }">
                             <label for="live-udpxy">udpxy 代理服务地址</label>
                             <input type="text" id="live-udpxy" v-model="liveConfig.udpxy_address" placeholder="例如: http://192.168.1.1:6688" :disabled="!liveConfig.udpxy_enabled_bool">
-                            <small class="form-help">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
+                            <small class="status-desc">用于转换 igmp:// 组播到 http:// 代理地址。若为空则保持原始组播输出。</small>
                         </div>
                         <div class="form-group mb-15">
                             <label for="live-logo-url">LOGO 基础 URL</label>
                             <input type="text" id="live-logo-url" v-model="liveConfig.logo_base_url" placeholder="默认为 /static/logo/">
-                            <small class="form-help">用于拼接频道台标地址。若是相对路径，生成 M3U 时会自动拼接当前的网卡 Host 头部。</small>
+                            <small class="status-desc">用于拼接频道台标地址。若是相对路径，生成 M3U 时会自动拼接当前的网卡 Host 头部。</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -656,7 +656,7 @@ const LiveTab = {
                                 <tbody id="category-sortable-tbody" :key="categoryTbodyKey">
                                     <tr v-for="cat in liveCategories" :key="cat.id" :data-cat-id="cat.id">
                                         <td class="drag-handle w-40">
-                                            <span class="fs-12-muted">⋮⋮</span>
+                                            <span class="fs-12" style="color:#999">⋮⋮</span>
                                         </td>
                                         <td><input type="text" v-model="cat.name" class="input-table-cell"></td>
                                         <td><span>{{ cat.sort_index }}</span></td>
@@ -678,7 +678,7 @@ const LiveTab = {
                                 <button class="btn btn-secondary btn-sm" @click="exportCategoryMappings">📤 导出"频道-分类"关系</button>
                                 <button class="btn btn-secondary btn-sm" @click="triggerCategoryMappingImport">📥 导入"频道-分类"关系</button>
                             </div>
-                            <small class="form-help mt-4">导出或导入频道与分类的对应分配关系。导入时若对应分类不存在，系统将自动创建该分类，并自动关联频道。</small>
+                            <small class="status-desc">导出或导入频道与分类的对应分配关系。导入时若对应分类不存在，系统将自动创建该分类，并自动关联频道。</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -704,7 +704,7 @@ const LiveTab = {
                         <div class="form-group">
                             <label>别名<span class="text-muted hint-xs">（只读，由别名映射控制）</span></label>
                             <input type="text" :value="editingCh.display_name || editingCh.name" disabled class="input-disabled">
-                            <small v-if="editingCh.source === 'server'" class="form-help">在频道列表中点击原名打开别名映射。</small>
+                            <small v-if="editingCh.source === 'server'" class="status-desc">在频道列表中点击原名打开别名映射。</small>
                         </div>
                         <div class="form-group">
                             <label>所属分类</label>
@@ -721,7 +721,7 @@ const LiveTab = {
                             <div class="form-group">
                                 <label>tvg-id / tvg-name<span class="text-muted hint-xs">（自动归一化生成）</span></label>
                                 <input type="text" :value="editingCh.tvg_id" disabled class="input-disabled input-half">
-                                <input type="text" :value="editingCh.tvg_name" disabled class="input-disabled input-half mt-4">
+                                <input type="text" :value="editingCh.tvg_name" disabled class="input-disabled input-half mt-15">
                             </div>
                         </template>
                         <template v-if="editingCh.source === 'external'">
@@ -753,10 +753,10 @@ const LiveTab = {
                         <button class="modal-close" @click="showAliasModal = false">×</button>
                     </div>
                     <div class="modal-body">
-                        <p class="form-help mb-12">将服务器下发的乱名映射为规范名称。例如：<code>中央音乐高清</code> → <code>CCTV15音乐高清</code></p>
+                        <p class="status-desc">将服务器下发的乱名映射为规范名称。例如：<code>中央音乐高清</code> → <code>CCTV15音乐高清</code></p>
                         <div class="category-add-inline">
                             <input type="text" v-model="newAlias.source_name" placeholder="原始名称" class="input-sm flex-1">
-                            <span class="pad-x8-muted">→</span>
+                            <span class="pad-x8 text-muted">→</span>
                             <input type="text" v-model="newAlias.target_name" placeholder="规范名称" class="input-sm flex-1">
                             <button class="btn btn-primary btn-sm" @click="addAlias">＋ 添加</button>
                         </div>
@@ -764,7 +764,7 @@ const LiveTab = {
                             <table class="live-table table-sm">
                                 <thead><tr><th class="w-50p">原始名称 (source)</th><th class="w-50p">规范名称 (target)</th><th class="w-100">操作</th></tr></thead>
                                 <tbody>
-                                    <tr v-if="aliases.length === 0"><td colspan="3" class="empty-row pad-20">暂无别名映射，添加一条试试</td></tr>
+                                    <tr v-if="aliases.length === 0"><td colspan="3" class="empty-row">暂无别名映射，添加一条试试</td></tr>
                                     <tr v-for="a in aliases" :key="a.id">
                                         <td><input type="text" v-model="a.source_name" class="input-table-cell"></td>
                                         <td><input type="text" v-model="a.target_name" class="input-table-cell"></td>
@@ -784,7 +784,7 @@ const LiveTab = {
                                 <button class="btn btn-secondary btn-sm" @click="triggerAliasImport">📥 导入 JSON</button>
                                 <button class="btn btn-warning btn-sm" @click="reapplyAliases">🔄 重新应用到频道</button>
                             </div>
-                            <small class="form-help mt-4">修改别名后自动应用到已有频道。换设备部署时，导出 JSON 备份，导入即可恢复。</small>
+                            <small class="status-desc">修改别名后自动应用到已有频道。换设备部署时，导出 JSON 备份，导入即可恢复。</small>
                         </div>
                     </div>
                     <div class="modal-footer">

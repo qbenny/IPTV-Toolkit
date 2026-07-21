@@ -82,9 +82,9 @@ const VodTab = {
                 <div class="card">
                     <div class="card-header"><h3>VOD 过滤设置</h3></div>
                     <div class="status-list mt-15">
-                        <div class="form-group inline-checkbox-group mb-15"><div class="switch-item"><label class="switch-toggle"><input type="checkbox" v-model="vodConfig.low_quality_filter_bool"><span class="switch-slider"></span></label><span class="switch-label-text">🗑️ 过滤低质量内容</span></div><small class="form-help text-muted">屏蔽 电视剧/综艺 的 ep=0&sc=0 垃圾，纪录 无海报垃圾。电影/少儿/动漫 不受影响。重启 TVBox 生效。</small></div>
-                        <div class="form-group inline-checkbox-group mb-15"><div class="switch-item"><label class="switch-toggle"><input type="checkbox" v-model="vodConfig.m3u8_filter_bool"><span class="switch-slider"></span></label><span class="switch-label-text">📦 屏蔽 m3u8 内容池</span></div><small class="form-help text-muted">屏蔽 JHT/YANHUA/YANKUM 三个池（~1645 条，格式不兼容）。重启 TVBox 生效。</small></div>
-                        <div class="form-actions mt-15"><button class="btn btn-primary w-full" @click="saveVodConfig">💾 保存过滤设置</button></div>
+                        <div class="form-group inline-checkbox-group"><div class="switch-item"><label class="switch-toggle"><input type="checkbox" v-model="vodConfig.low_quality_filter_bool"><span class="switch-slider"></span></label><span class="switch-label-text">🗑️ 过滤低质量内容</span></div><small class="status-desc">屏蔽 电视剧/综艺 的 ep=0&sc=0 垃圾，纪录 无海报垃圾。电影/少儿/动漫 不受影响。重启 TVBox 生效。</small></div>
+                        <div class="form-group inline-checkbox-group"><div class="switch-item"><label class="switch-toggle"><input type="checkbox" v-model="vodConfig.m3u8_filter_bool"><span class="switch-slider"></span></label><span class="switch-label-text">📦 屏蔽 m3u8 内容池</span></div><small class="status-desc">屏蔽 JHT/YANHUA/YANKUM 三个池（~1645 条，格式不兼容）。重启 TVBox 生效。</small></div>
+                        <div class="form-actions"><button class="btn btn-primary w-full" @click="saveVodConfig">💾 保存过滤设置</button></div>
                     </div>
                 </div>
             </div>

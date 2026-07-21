@@ -66,7 +66,7 @@ const EpgTab = {
                     <div class="status-item"><span class="status-label">频道数</span><span class="status-val text-success">{{ epgStats.total_channels }}</span></div>
                     <div class="status-item"><span class="status-label">日期范围</span><span class="status-val">{{ epgStats.date_range?.earliest||'-' }} ~ {{ epgStats.date_range?.latest||'-' }}</span></div>
                 </div>
-                <p class="status-desc mt-15">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
+                <p class="status-desc">VIS api/schedules/ | 无需认证 | 覆盖全频道 | 保留 9 天</p>
             </div>
         </div>
         <div class="card"><div class="card-header"><h3>当前正在播放</h3><button class="btn btn-secondary btn-sm" @click="fetchNowPlaying">刷新</button></div>

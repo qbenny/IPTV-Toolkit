@@ -662,6 +662,8 @@ select:focus {
     font-size: 13px;
     color: var(--text-muted);
     line-height: 1.5;
+    margin-top: 15px;
+    display: block;
 }
 
 .status-val.text-muted {
@@ -1064,8 +1066,6 @@ select:focus {
 }
 
 .drag-handle:active { cursor: grabbing; }
-    margin-left: 10px;
-}
 
 .url-cell {
     max-width: 260px;
@@ -1797,9 +1797,6 @@ select:focus {
  * 内联样式提取工具类（供 LiveTab 等组件复用）
  * ========================================== */
 
-/* --- 文本对齐 --- */
-.ta-center { text-align: center; }
-
 /* --- 不换行 --- */
 .nowrap { white-space: nowrap; }
 
@@ -1815,23 +1812,15 @@ select:focus {
 
 /* --- 字体 --- */
 .fs-11      { font-size: 11px; }
-.fs-12-muted { font-size: 12px; color: #999; }
-.fs-14-fw600 { font-size: 14px; font-weight: 600; color: var(--text-main); }
+.fs-12      { font-size: 12px; }
+.fs-14      { font-size: 14px; }
 .fw-600     { font-weight: 600; }
 
 /* --- 小提示文字 --- */
 .hint-xs { font-size: 11px; margin-left: 4px; }
 
 /* --- margin / padding 工具类 --- */
-.mt-4  { margin-top: 4px; }
-.mt-10 { margin-top: 10px; }
-.mb-12 { margin-bottom: 12px; }
-.mb-20 { margin-bottom: 20px; }
-.pad-4   { padding: 4px; }
-.pad-20  { padding: 20px; }
-.pad-30  { padding: 30px; }
-.pad-x8-muted { padding: 0 8px; color: var(--text-muted); }
-.mr-8-vmid { margin-right: 8px; vertical-align: middle; }
+.pad-x8 { padding: 0 8px; }
 
 /* --- 分隔线（上边框 + 内边距） --- */
 .divider-top {
@@ -1844,7 +1833,7 @@ select:focus {
 /* --- 拖拽手柄 --- */
 
 /* --- 空状态单元格（原 empty-row 仅作类名，此处补基础样式） --- */
-.empty-row { text-align: center; color: var(--text-muted); }
+.empty-row { text-align: center; color: var(--text-muted); padding: 24px; }
 
 /* --- 频道台标缩略图 --- */
 .channel-logo {
@@ -1880,9 +1869,7 @@ select:focus {
 .w-150 { width: 150px; }
 .w-200 { width: 200px; }
 
-/* --- 补充：小提示(8px) / 14px 弱化文字 --- */
-.hint-sm { font-size: 11px; margin-left: 8px; }
-.fs-14-muted { font-size: 14px; color: var(--text-muted); }
+
 
 /* --- 补充：频道标签更多配色变体 --- */
 .tag-blue {

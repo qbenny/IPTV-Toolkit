@@ -296,7 +296,7 @@ const StbTab = {
                         <input type="text" id="stb-ip" v-model="stbConfig.ip_address" placeholder="空值将利用路由表自动探测绑定">
                     </div>
                 </div>
-                <div class="form-actions">
+                <div class="form-actions mt-15">
                     <button class="btn btn-primary w-full" @click="saveStbConfig" :disabled="savingStb">
                         <span class="spinner" v-if="savingStb"></span>
                         {{ savingStb ? '正在保存并验证...' : '💾 保存配置并测试登录' }}
