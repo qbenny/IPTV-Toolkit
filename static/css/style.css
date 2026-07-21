@@ -1782,3 +1782,113 @@ select:focus {
 /* --- margin 工具类（使用 CSS 变量映射） --- */
 .mt-15 { margin-top: 15px; }
 .mb-15 { margin-bottom: 15px; }
+
+/* ==========================================
+ * 内联样式提取工具类（供 LiveTab 等组件复用）
+ * ========================================== */
+
+/* --- 文本对齐 --- */
+.ta-center { text-align: center; }
+
+/* --- 不换行 --- */
+.nowrap { white-space: nowrap; }
+
+/* --- 弹性子项 --- */
+.flex-1 { flex: 1; }
+
+/* --- 固定宽度 --- */
+.w-40  { width: 40px; }
+.w-80  { width: 80px; }
+.w-100 { width: 100px; }
+.w-120 { width: 120px; }
+.w-50p { width: 50%; }
+
+/* --- 字体 --- */
+.fs-11      { font-size: 11px; }
+.fs-12-muted { font-size: 12px; color: #999; }
+.fs-14-fw600 { font-size: 14px; font-weight: 600; color: var(--text-main); }
+.fw-600     { font-weight: 600; }
+
+/* --- 小提示文字 --- */
+.hint-xs { font-size: 11px; margin-left: 4px; }
+
+/* --- margin / padding 工具类 --- */
+.mt-4  { margin-top: 4px; }
+.mt-10 { margin-top: 10px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-20 { margin-bottom: 20px; }
+.pad-4   { padding: 4px; }
+.pad-20  { padding: 20px; }
+.pad-30  { padding: 30px; }
+.pad-x8-muted { padding: 0 8px; color: var(--text-muted); }
+.mr-8-vmid { margin-right: 8px; vertical-align: middle; }
+
+/* --- 分隔线（上边框 + 内边距） --- */
+.divider-top {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* --- 行操作区靠左 --- */
+.row-actions-start { justify-content: flex-start; gap: 8px; }
+
+/* --- 拖拽手柄 --- */
+.cursor-grab { cursor: grab; }
+.drag-grip { cursor: move; color: var(--text-muted); font-size: 16px; }
+
+/* --- 空状态单元格（原 empty-row 仅作类名，此处补基础样式） --- */
+.empty-row { text-align: center; color: var(--text-muted); }
+
+/* --- 频道台标缩略图 --- */
+.channel-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px;
+    border: 1px solid var(--border-color);
+}
+
+/* --- 频道标签配色变体 --- */
+.tag-primary {
+    background: rgba(var(--color-primary-rgb), 0.1);
+    color: var(--color-primary);
+    border-color: rgba(var(--color-primary-rgb), 0.2);
+}
+.tag-green {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* --- 杂项布局 --- */
+.w-modal-narrow { max-width: 580px; width: 90%; }
+.flex-ac-g8 { display: flex; align-items: center; gap: 8px; }
+.col-stack { padding-top: 10px; display: flex; flex-direction: column; gap: 15px; }
+.mb-15-fade { margin-bottom: 15px; transition: opacity 0.2s; }
+
+/* --- 补充：表头列宽 --- */
+.w-90  { width: 90px; }
+.w-150 { width: 150px; }
+.w-200 { width: 200px; }
+
+/* --- 补充：小提示(8px) / 14px 弱化文字 --- */
+.hint-sm { font-size: 11px; margin-left: 8px; }
+.fs-14-muted { font-size: 14px; color: var(--text-muted); }
+
+/* --- 补充：频道标签更多配色变体 --- */
+.tag-blue {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border-color: rgba(59, 130, 246, 0.2);
+    font-weight: 600;
+    cursor: pointer;
+}
+.tag-slate {
+    background: rgba(100, 116, 139, 0.1);
+    color: #64748b;
+    border-color: rgba(100, 116, 139, 0.2);
+    opacity: 0.7;
+}
