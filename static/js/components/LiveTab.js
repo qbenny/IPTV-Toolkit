@@ -145,7 +145,7 @@ const LiveTab = {
         },
 
         /* ========== 分类管理 ========== */
-        openCategoryModal() { this.showCategoryModal = true; },
+        openCategoryModal() { this.showCategoryModal = true; this.$nextTick(() => { this.initCategorySortable(); }); },
         async addLiveCategory() {
             if (!this.newCategory.name.trim()) { this.showToast('请输入分类名称', 'error'); return; }
             try {
@@ -495,22 +495,22 @@ const LiveTab = {
                     </div>
                 </div>
                 <div class="table-container"><table class="live-table"><thead><tr>
-                    <th class="cell-sm"><input type="checkbox" id="select-all" name="select_all" v-model="selectAllChannels" @change="toggleSelectAll"></th><th class="cell-sm">启用</th><th class="cell-sm">排序</th><th class="w-100">序号 / ID</th><th class="cell-sm">台标</th><th class="w-150">原名</th><th class="w-200">别名</th><th class="w-90">所属分类</th><th>组播地址</th><th>单播地址</th><th class="w-120 ta-center">操作</th>
+                    <th class="col-tight"><input type="checkbox" id="select-all" name="select_all" v-model="selectAllChannels" @change="toggleSelectAll"></th><th class="col-tight">启用</th><th class="col-tight">排序</th><th class="w-100">序号 / ID</th><th>台标</th><th class="w-150">原名</th><th class="w-200">别名</th><th class="w-90">所属分类</th><th>组播地址</th><th>单播地址</th><th class="w-120">操作</th>
                 </tr></thead>
                 <tbody id="live-channel-list-tbody" :key="tbodyKey">
                     <tr v-if="liveChannels.length === 0"><td colspan="11" class="empty-row pad-30">暂无满足条件的频道数据，请尝试同步或手动导入</td></tr>
                     <tr v-for="ch in liveChannels" :key="ch.id" :data-id="ch.id" class="live-channel-row">
-                        <td class="ta-center"><input type="checkbox" :name="'ch_select_' + ch.id" :value="ch.id" v-model="selectedChannelIds"></td>
-                        <td class="ta-center"><label class="switch-toggle"><input type="checkbox" :name="'ch_enabled_' + ch.id" :checked="ch.is_enabled === 1" @change="toggleChannelEnabled(ch)"><span class="switch-slider"></span></label></td>
-                        <td class="drag-handle ta-center"><span class="drag-grip">☰</span></td>
+                        <td class="col-tight"><input type="checkbox" :name="'ch_select_' + ch.id" :value="ch.id" v-model="selectedChannelIds"></td>
+                        <td class="col-tight"><label class="switch-toggle"><input type="checkbox" :name="'ch_enabled_' + ch.id" :checked="ch.is_enabled === 1" @change="toggleChannelEnabled(ch)"><span class="switch-slider"></span></label></td>
+                        <td class="drag-handle col-tight"><span>☰</span></td>
                         <td class="nowrap"><span class="text-secondary fw-600" v-if="ch.user_channel_id">{{ ch.user_channel_id }}</span><span class="text-muted hint-sm" v-if="ch.channel_id">(ID: {{ ch.channel_id }})</span></td>
-                        <td class="ta-center pad-4"><img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" class="channel-logo" @error="handleLogoError(ch)"><span v-else class="fs-14-muted">📺</span></td>
+                        <td class="pad-4"><img v-if="ch.logo_url && !ch.logo_failed" :src="getLogoUrl(ch.logo_url)" alt="logo" class="channel-logo" @error="handleLogoError(ch)"><span v-else class="fs-14-muted">📺</span></td>
                         <td class="nowrap"><span class="channel-name-cell clickable" :title="'点击添加别名映射: ' + ch.name" @click="quickAddAlias(ch.name)">{{ ch.name }}</span></td>
                         <td class="nowrap"><span class="channel-name-cell">{{ ch.display_name || ch.name }}</span><span v-if="ch.source === 'external'" class="channel-tag tag-primary">外部</span><span v-if="ch.timeshift_enabled === 1" class="channel-tag tag-green" :title="'支持时移回看，回看时长共 ' + (ch.back_time || 0) + ' 天'">回看: {{ ch.back_time || 0 }}天</span><span v-if="ch.epg_days && ch.epg_days > 0" class="channel-tag tag-blue" :title="'点击预览 EPG 节目单 (当前共 ' + ch.epg_days + ' 天)'" @click="openEpgPreview(ch)">EPG: {{ ch.epg_days }}天</span><span v-else class="channel-tag tag-slate" title="暂无可用 EPG 数据">无EPG</span></td>
                         <td><select :name="'ch_cat_' + ch.id" class="cat-select" v-model="ch.category_id" @change="changeChannelCategory(ch)" :style="{ borderLeft: '4px solid ' + (ch.category_color || 'var(--border-color)') }"><option :value="0">未分类</option><option v-for="cat in liveCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></td>
                         <td class="url-cell" :title="ch.multicast_url"><code class="url-text">{{ ch.multicast_url || '—' }}</code></td>
                         <td class="url-cell" :title="ch.unicast_url"><code class="url-text">{{ ch.unicast_url || '—' }}</code></td>
-                        <td class="ta-center"><div class="row-actions justify-center"><button v-if="ch.source === 'external'" class="btn-text btn-text-danger" @click="deleteChannel(ch.id)" title="删除外部频道">🗑️</button></div></td>
+                        <td><div class="row-actions"><button v-if="ch.source === 'external'" class="btn-text btn-text-danger" @click="deleteChannel(ch.id)" title="删除外部频道">🗑️</button></div></td>
                     </tr>
                 </tbody></table></div>
             </div>
@@ -646,25 +646,25 @@ const LiveTab = {
                             <table class="live-table table-sm">
                                 <thead>
                                     <tr>
-                                        <th class="w-40 ta-center">排序</th>
+                                        <th class="w-40">排序</th>
                                         <th>分类名称</th>
                                         <th class="w-100">排序索引</th>
-                                        <th class="w-80 ta-center">标色</th>
-                                        <th class="w-120 ta-center">操作</th>
+                                        <th class="w-80">标色</th>
+                                        <th class="w-120">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="category-sortable-tbody" :key="categoryTbodyKey">
                                     <tr v-for="cat in liveCategories" :key="cat.id" :data-cat-id="cat.id">
-                                        <td class="drag-handle ta-center w-40 cursor-grab">
+                                        <td class="drag-handle w-40">
                                             <span class="fs-12-muted">⋮⋮</span>
                                         </td>
                                         <td><input type="text" v-model="cat.name" class="input-table-cell"></td>
-                                        <td class="ta-center"><span>{{ cat.sort_index }}</span></td>
-                                        <td class="ta-center">
+                                        <td><span>{{ cat.sort_index }}</span></td>
+                                        <td>
                                             <color-picker :color="cat.color" @select="cat.color = $event; updateLiveCategory(cat)"></color-picker>
                                         </td>
-                                        <td class="ta-center">
-                                            <div class="row-actions justify-center">
+                                        <td>
+                                            <div class="row-actions">
                                                 <button class="btn-text btn-text-primary" @click="updateLiveCategory(cat)">保存</button>
                                                 <button class="btn-text btn-text-danger" @click="deleteLiveCategory(cat.id)">删除</button>
                                             </div>
@@ -674,7 +674,7 @@ const LiveTab = {
                             </table>
                         </div>
                         <div class="divider-top">
-                            <div class="row-actions row-actions-start">
+                            <div class="row-actions">
                                 <button class="btn btn-secondary btn-sm" @click="exportCategoryMappings">📤 导出"频道-分类"关系</button>
                                 <button class="btn btn-secondary btn-sm" @click="triggerCategoryMappingImport">📥 导入"频道-分类"关系</button>
                             </div>
@@ -762,14 +762,14 @@ const LiveTab = {
                         </div>
                         <div class="category-list-container">
                             <table class="live-table table-sm">
-                                <thead><tr><th class="w-50p">原始名称 (source)</th><th class="w-50p">规范名称 (target)</th><th class="w-100 ta-center">操作</th></tr></thead>
+                                <thead><tr><th class="w-50p">原始名称 (source)</th><th class="w-50p">规范名称 (target)</th><th class="w-100">操作</th></tr></thead>
                                 <tbody>
                                     <tr v-if="aliases.length === 0"><td colspan="3" class="empty-row pad-20">暂无别名映射，添加一条试试</td></tr>
                                     <tr v-for="a in aliases" :key="a.id">
                                         <td><input type="text" v-model="a.source_name" class="input-table-cell"></td>
                                         <td><input type="text" v-model="a.target_name" class="input-table-cell"></td>
-                                        <td class="ta-center">
-                                            <div class="row-actions justify-center">
+                                        <td>
+                                            <div class="row-actions">
                                                 <button class="btn-text btn-text-primary" @click="saveAlias(a)">保存</button>
                                                 <button class="btn-text btn-text-danger" @click="deleteAlias(a.id)">删除</button>
                                             </div>
@@ -779,7 +779,7 @@ const LiveTab = {
                             </table>
                         </div>
                         <div class="divider-top">
-                            <div class="row-actions row-actions-start">
+                            <div class="row-actions">
                                 <button class="btn btn-secondary btn-sm" @click="exportAliases">📤 导出 JSON</button>
                                 <button class="btn btn-secondary btn-sm" @click="triggerAliasImport">📥 导入 JSON</button>
                                 <button class="btn btn-warning btn-sm" @click="reapplyAliases">🔄 重新应用到频道</button>

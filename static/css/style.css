@@ -1018,7 +1018,7 @@ select:focus {
 
 .live-table th {
     text-align: left;
-    padding: 14px 16px;
+    padding: 14px 8px;
     color: var(--text-muted);
     font-weight: 600;
     border-bottom: 1px solid var(--border-color);
@@ -1028,9 +1028,16 @@ select:focus {
 }
 
 .live-table td {
-    padding: 8px 16px;
+    padding: 8px 8px;
     border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
+}
+
+/* 紧凑列：收缩到内容最小宽度，多余空间让给长文本列（桌面宽屏下防止窄列被撑宽） */
+.live-table th.col-tight,
+.live-table td.col-tight {
+    width: 1%;
+    white-space: nowrap;
 }
 
 .live-channel-row {
@@ -1053,7 +1060,10 @@ select:focus {
     cursor: grab;
     user-select: none;
     color: var(--text-muted);
-    font-size: 14px;
+    font-size: 16px;
+}
+
+.drag-handle:active { cursor: grabbing; }
     margin-left: 10px;
 }
 
@@ -1077,7 +1087,7 @@ select:focus {
     flex-wrap: nowrap !important;
     gap: 8px;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     white-space: nowrap;
 }
 
@@ -1830,12 +1840,8 @@ select:focus {
     border-top: 1px solid var(--border-color);
 }
 
-/* --- 行操作区靠左 --- */
-.row-actions-start { justify-content: flex-start; gap: 8px; }
 
 /* --- 拖拽手柄 --- */
-.cursor-grab { cursor: grab; }
-.drag-grip { cursor: move; color: var(--text-muted); font-size: 16px; }
 
 /* --- 空状态单元格（原 empty-row 仅作类名，此处补基础样式） --- */
 .empty-row { text-align: center; color: var(--text-muted); }
