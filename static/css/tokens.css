@@ -14,7 +14,6 @@
     --bg-app: #090d16;
     --bg-sidebar: #0f1524;
     --bg-card: rgba(22, 30, 49, 0.7);
-    --bg-card-hover: rgba(30, 41, 67, 0.8);
     --border-color: rgba(255, 255, 255, 0.08);
     --border-hover: rgba(255, 255, 255, 0.15);
 
@@ -28,7 +27,6 @@
     --color-primary-hover: #4f46e5;
     --color-primary-rgb: 99, 102, 241;
     --color-secondary: #0ea5e9;
-    --color-secondary-hover: #0284c7;
 
     /* 语义色 */
     --color-success: #10b981;
@@ -39,7 +37,6 @@
 
     /* 阴影 */
     --shadow-main: 0 10px 30px rgba(0, 0, 0, 0.5);
-    --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 
     /* 滚动条 */
     --scroll-track: #0f1524;
@@ -55,15 +52,11 @@
 
     /* ── 组件级背景 ── */
     --subtle-bg: rgba(255, 255, 255, 0.02);         /* 极淡行条：task-row / live-row-hover */
-    --panel-raised-bg: var(--bg-hover);              /* 微提亮面板：status-item */
     --epg-date-nav-bg: rgba(0, 0, 0, 0.15);
-    --epg-program-list-bg: var(--bg-input);
-    --epg-prog-row-hover-bg: var(--bg-hover);
     --epg-playing-bg: rgba(16, 185, 129, 0.08);
     --epg-playing-border: #10b981;
     --epg-badge-bg: rgba(16, 185, 129, 0.15);
     --epg-badge-color: #10b981;
-    --epg-badge-border: rgba(16, 185, 129, 0.3);
 
     /* ── 开关 Toggle ── */
     --switch-track-bg: rgba(255, 255, 255, 0.08);
@@ -99,23 +92,21 @@
 [data-theme="light"] {
     /* 页面框架 */
     --bg-app: #f1f5f9;
-    --bg-sidebar: #ffffff;
+    --bg-sidebar: #fff;
     --bg-card: rgba(255, 255, 255, 0.85);
-    --bg-card-hover: rgba(255, 255, 255, 0.95);
     --border-color: rgba(0, 0, 0, 0.08);
     --border-hover: rgba(0, 0, 0, 0.15);
 
     /* 文字 */
     --text-main: #0f172a;
     --text-muted: #64748b;
-    --text-inverse: #ffffff;
+    --text-inverse: #fff;
 
     /* 品牌色 */
     --color-primary: #4f46e5;
     --color-primary-hover: #3730a3;
     --color-primary-rgb: 79, 70, 229;
     --color-secondary: #0284c7;
-    --color-secondary-hover: #0369a1;
 
     /* 语义色 */
     --color-success: #059669;
@@ -126,7 +117,6 @@
 
     /* 阴影 */
     --shadow-main: 0 10px 25px rgba(15, 23, 42, 0.06);
-    --shadow-inset: inset 0 2px 4px rgba(15, 23, 42, 0.05);
 
     /* 滚动条 */
     --scroll-track: #f1f5f9;
@@ -142,15 +132,11 @@
 
     /* ── 组件级背景 ── */
     --subtle-bg: rgba(0, 0, 0, 0.02);               /* 极淡行条 */
-    --panel-raised-bg: rgba(255, 255, 255, 0.4);     /* 微提亮面板：status-item */
     --epg-date-nav-bg: rgba(0, 0, 0, 0.03);
-    --epg-program-list-bg: rgba(0, 0, 0, 0.025);
-    --epg-prog-row-hover-bg: rgba(0, 0, 0, 0.03);
     --epg-playing-bg: rgba(5, 150, 105, 0.08);
     --epg-playing-border: #059669;
     --epg-badge-bg: rgba(5, 150, 105, 0.15);
     --epg-badge-color: #059669;
-    --epg-badge-border: rgba(5, 150, 105, 0.3);
 
     /* ── 开关 Toggle ── */
     --switch-track-bg: rgba(0, 0, 0, 0.05);
@@ -180,3 +166,4 @@
     --log-item-warning-bg: rgba(217, 119, 6, 0.01);
     --log-item-warning-border: #d97706;
 }
+

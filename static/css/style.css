@@ -54,7 +54,7 @@ body {
 }
 
 /* App container */
-#app {
+.app {
     display: flex;
     width: 100%;
     min-height: 100vh;
@@ -198,11 +198,10 @@ body {
 
 .api-links-panel {
     display: flex;
-    flex-direction: row;
+    flex-flow: row wrap;
     gap: 12px;
     align-items: center;
     flex-shrink: 0;
-    flex-wrap: wrap;
     justify-content: flex-end;
 }
 
@@ -288,7 +287,11 @@ body {
     gap: 16px;
     align-items: start;
 }
-.left-col { display: flex; flex-direction: column; gap: 16px; }
+.left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
 .card-grid.cols-3 {
     grid-template-columns: 1fr 1fr 1fr;
 }
@@ -539,8 +542,16 @@ select:focus {
     flex-wrap: wrap;
 }
 
-.hour-select { flex: 0 0 auto; min-width: 130px; font-size: 13px; transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s; }
-.hour-select:disabled { opacity: 0.5; cursor: not-allowed; }
+.hour-select {
+    flex: 0 0 auto;
+    min-width: 130px;
+    font-size: 13px;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+.hour-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 
 .task-status {
     display: flex;
@@ -694,7 +705,7 @@ select:focus {
 }
 
 .token-text {
-    font-family: 'Consolas', 'Fira Code', monospace;
+    font-family: Consolas, 'Fira Code', monospace;
     font-size: 13px;
     letter-spacing: 0.5px;
     overflow: hidden;
@@ -817,9 +828,9 @@ select:focus {
 }
 
 .btn-sm {
-    padding: 6px 12px !important;
-    font-size: 13px !important;
-    border-radius: 8px !important;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 8px;
 }
 
 .auto-scroll-label {
@@ -839,7 +850,7 @@ select:focus {
     padding: 16px;
     height: 500px;
     overflow-y: auto;
-    font-family: 'Consolas', 'Fira Code', Courier, monospace;
+    font-family: Consolas, 'Fira Code', Courier, monospace;
     font-size: 13px;
     line-height: 1.6;
     border: 1px solid var(--border-color);
@@ -988,7 +999,7 @@ select:focus {
     gap: 8px;
 }
 
-.search-group input {
+.search-group input { /* stylelint-disable-line no-descending-specificity */
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     color: var(--text-main);
@@ -1051,7 +1062,7 @@ select:focus {
 }
 
 .live-channel-row.sortable-chosen {
-    background-color: var(--ring-focus) !important;
+    background-color: var(--ring-focus);
 }
 
 .live-channel-row.sortable-ghost {
@@ -1083,8 +1094,7 @@ select:focus {
 
 .row-actions {
     display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap !important;
+    flex-flow: row nowrap;
     gap: 8px;
     align-items: center;
     justify-content: flex-start;
@@ -1104,7 +1114,7 @@ select:focus {
     padding: 4px 8px;
     border-radius: 4px;
     transition: background-color 0.2s;
-    white-space: nowrap !important;
+    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -1131,10 +1141,7 @@ select:focus {
 /* Modals Custom Styles */
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0 0 0 0;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1236,10 +1243,7 @@ select:focus {
 
 .color-picker-mask {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0 0 0 0;
     z-index: 90;
 }
 
@@ -1403,8 +1407,8 @@ select:focus {
 }
 
 .epg-prog-row.is-playing {
-    background: var(--epg-playing-bg) !important;
-    border-left-color: var(--epg-playing-border) !important;
+    background: var(--epg-playing-bg);
+    border-left-color: var(--epg-playing-border);
 }
 
 @keyframes pulse-green {
@@ -1428,7 +1432,7 @@ select:focus {
     vertical-align: middle;
 }
 
-.switch-toggle input {
+.switch-toggle input { /* stylelint-disable-line no-descending-specificity */
     opacity: 0;
     width: 0;
     height: 0;
@@ -1437,48 +1441,45 @@ select:focus {
 .switch-slider {
     position: absolute;
     cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0 0 0 0;
     background-color: var(--switch-track-bg);
     border: 1px solid var(--border-color);
     transition: .3s;
     border-radius: 20px;
+    --knob-x: 0;
+    --knob-bg: var(--text-muted);
 }
 
-.switch-slider:before {
+.switch-slider::before {
     position: absolute;
     content: "";
     height: 12px;
     width: 12px;
     left: 3px;
     bottom: 3px;
-    background-color: var(--text-muted);
+    background-color: var(--knob-bg);
+    transform: translateX(var(--knob-x));
     transition: .3s;
     border-radius: 50%;
 }
 
-.switch-toggle input:checked + .switch-slider {
+.switch-toggle :checked + .switch-slider {
+    --knob-x: 20px;
+    --knob-bg: #fff;
     background-color: var(--color-success);
     border-color: var(--color-success);
 }
 
-.switch-toggle input:checked + .switch-slider:before {
-    transform: translateX(20px);
-    background-color: #fff;
-}
-
 /* 禁用态：滑块整体变灰、降低不透明度，视觉上明显不可用 */
-.switch-toggle input:disabled + .switch-slider {
-    background-color: var(--switch-disabled-bg) !important;
-    border-color: var(--switch-disabled-border) !important;
+.switch-toggle :disabled + .switch-slider {
+    background-color: var(--switch-disabled-bg);
+    border-color: var(--switch-disabled-border);
     opacity: 0.5;
     cursor: not-allowed;
 }
-.switch-toggle input:disabled:checked + .switch-slider {
-    background-color: var(--switch-disabled-checked-bg) !important;
-    border-color: var(--switch-disabled-checked-border) !important;
+:disabled:checked + .switch-slider {
+    background-color: var(--switch-disabled-checked-bg);
+    border-color: var(--switch-disabled-checked-border);
 }
 
 /* Batch Actions Bar */
@@ -1506,8 +1507,18 @@ select:focus {
     gap: 12px;
 }
 
-.batch-cat-select { padding: 6px 12px; border-radius: 6px; font-size: 12px; }
-.cat-select { padding: 4px 8px; border-radius: 6px; font-size: 12px; min-width: 80px; max-width: 110px; }
+.batch-cat-select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.cat-select {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    min-width: 80px;
+    max-width: 110px;
+}
 
 .channel-name-cell {
     font-size: 12px;
@@ -1549,25 +1560,25 @@ select:focus {
 }
 
 /* 6. Responsive (consolidated) */
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
     .card-grid, .card-grid.cols-3 {
         grid-template-columns: 1fr;
     }
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
     .form-grid {
         grid-template-columns: 1fr;
     }
 }
 
-@media (max-width: 768px) {
-    #app {
+@media (width <= 768px) {
+    .app {
         flex-direction: column;
     }
     .sidebar {
         position: relative;
-        width: 100% !important;
+        width: 100%;
         height: auto;
         top: auto;
         bottom: auto;
@@ -1581,16 +1592,15 @@ select:focus {
 
     /* 状态列表在移动端强制单列 */
     .horizontal-stats {
-        grid-template-columns: 1fr !important;
+        grid-template-columns: 1fr;
     }
-    .horizontal-stats .status-item.full { grid-column: 1 !important; }
+    .horizontal-stats .status-item.full { grid-column: 1; }
     .brand {
         margin-bottom: 12px;
         justify-content: center;
     }
     .nav-menu {
-        flex-direction: row !important;
-        flex-wrap: wrap;
+        flex-flow: row wrap;
         justify-content: center;
         gap: 8px;
         width: 100%;
@@ -1607,86 +1617,86 @@ select:focus {
         justify-content: center;
     }
     .theme-toggle-btn {
-        width: auto !important;
+        width: auto;
         padding: 8px 24px;
     }
     .main-content {
-        margin-left: 0 !important;
+        margin-left: 0;
         padding: 20px 16px;
         width: 100%;
         box-sizing: border-box;
     }
-    
+
     /* Live top panel layout on mobile */
     .live-top-panel {
-        flex-direction: column !important;
+        flex-direction: column;
     }
-    
+
     /* Live toolbar on mobile */
     .live-toolbar {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 16px !important;
-        padding: 16px !important;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        padding: 16px;
     }
     .toolbar-left {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 12px !important;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
     }
     .filter-group {
-        width: 100% !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
     }
     .filter-group label {
         margin-bottom: 4px;
     }
     .filter-group select, .filter-group input {
-        width: 100% !important;
+        width: 100%;
         box-sizing: border-box;
     }
     .search-group {
-        flex-direction: row !important;
+        flex-direction: row;
     }
     .search-group input {
         flex: 1;
     }
     .toolbar-right {
-        flex-wrap: wrap !important;
-        justify-content: center !important;
-        gap: 8px !important;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
         width: 100%;
     }
     .toolbar-right button {
-        flex: 1 1 calc(50% - 8px) !important;
-        min-width: 110px !important;
-        margin: 0 !important;
+        flex: 1 1 calc(50% - 8px);
+        min-width: 110px;
+        margin: 0;
     }
-    
+
     /* Batch actions on mobile */
     .batch-actions-bar {
-        flex-direction: column !important;
-        gap: 12px !important;
-        align-items: stretch !important;
-        margin: 12px 12px 0 12px !important;
-        padding: 12px !important;
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+        margin: 12px 12px 0 12px;
+        padding: 12px;
     }
     .batch-buttons {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 8px !important;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
     }
     .batch-cat-select {
-        width: 100% !important;
+        width: 100%;
     }
-    
+
     /* Category inline additions */
     .category-add-inline {
-        flex-wrap: wrap !important;
-        gap: 8px !important;
+        flex-wrap: wrap;
+        gap: 8px;
     }
-    
+
     /* Tables responsiveness */
     .table-container {
         overflow-x: auto;
@@ -1695,8 +1705,8 @@ select:focus {
 
     /* API links panel: stack vertically on mobile */
     .api-links-panel {
-        flex-direction: column !important;
-        align-items: stretch !important;
+        flex-direction: column;
+        align-items: stretch;
         width: 100%;
     }
     .api-link-item {
@@ -1727,7 +1737,7 @@ select:focus {
 
 /* --- 溢出截断 --- */
 .btn-xs {
-    padding: 4px 10px !important;
+    padding: 4px 10px;
     font-size: 12px;
 }
 
@@ -1770,7 +1780,6 @@ select:focus {
 .epg-badge-playing {
     background: var(--epg-badge-bg);
     color: var(--epg-badge-color);
-    border-color: var(--epg-badge-border);
     font-weight: 600;
     font-size: 10px;
     padding: 1px 6px;
@@ -1817,7 +1826,10 @@ select:focus {
 .fw-600     { font-weight: 600; }
 
 /* --- 小提示文字 --- */
-.hint-xs { font-size: 11px; margin-left: 4px; }
+.hint-xs {
+    font-size: 11px;
+    margin-left: 4px;
+}
 
 /* --- margin / padding 工具类 --- */
 .pad-x8 { padding: 0 8px; }
@@ -1833,7 +1845,11 @@ select:focus {
 /* --- 拖拽手柄 --- */
 
 /* --- 空状态单元格（原 empty-row 仅作类名，此处补基础样式） --- */
-.empty-row { text-align: center; color: var(--text-muted); padding: 24px; }
+.empty-row {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 24px;
+}
 
 /* --- 频道台标缩略图 --- */
 .channel-logo {
@@ -1859,10 +1875,25 @@ select:focus {
 }
 
 /* --- 杂项布局 --- */
-.w-modal-narrow { max-width: 580px; width: 90%; }
-.flex-ac-g8 { display: flex; align-items: center; gap: 8px; }
-.col-stack { padding-top: 10px; display: flex; flex-direction: column; gap: 15px; }
-.mb-15-fade { margin-bottom: 15px; transition: opacity 0.2s; }
+.w-modal-narrow {
+    max-width: 580px;
+    width: 90%;
+}
+.flex-ac-g8 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.col-stack {
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.mb-15-fade {
+    margin-bottom: 15px;
+    transition: opacity 0.2s;
+}
 
 /* --- 补充：表头列宽 --- */
 .w-90  { width: 90px; }
