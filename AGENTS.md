@@ -34,28 +34,29 @@ IPTV-Toolkit/
 │       ├── helpers.py        # parse_epg_json、IPTV 专网 IP 探测、LAN IP 探测
 │       ├── logger.py         # 日志（文件 + 控制台），LOG_FILE = data/iptv_toolkit.log
 │       └── normalize.py      # 频道名归一化（normalize_epg / normalize_logo）
-├── static/                   # 前端静态文件（index.html、css/、js/、logo/ 132 张 png）
+├── static/                   # 前端静态文件（index.html、css/、js/；Vue3 组件化，无构建步骤）
 ├── data/                     # 运行时数据（SQLite / 配置 / 日志；Docker volume 挂载）
 │   ├── iptv.db               # SQLite 主库
 │   ├── stb_config.json       # STB 凭证（user_id/stb_id/mac_address/ip_address/base_url/des_key）
 │   └── iptv_toolkit.log      # 运行日志
-├── old/                      # 已废弃的旧程序（新架构不再使用，不打入镜像）
-├── research_and_debug/       # 调试 / 研究脚本，不打入镜像
 ├── scratch/                  # 临时 / 实验目录，不打入镜像
-├── codebuddy/                # agent/IDE 内部数据，不打入镜像
+├── tests/                    # 测试（不打入镜像）
+├── tools/                    # 辅助脚本（不打入镜像）
+├── sample/                   # 示例数据（不打入镜像）
+├── docs/                     # 设计 / 调试 / 插件文档（不打入镜像）
+└── codebuddy/                # agent/IDE 内部数据，不打入镜像
 ├── main.py                   # ★ 应用入口：装配各模块、挂载路由、启动认证
 ├── Dockerfile                # 多阶段构建（python:3.12-alpine + pycryptodome 编译）
 └── requirements.txt          # 依赖：fastapi / uvicorn[standard] / requests / pycryptodome / python-multipart
 ```
 
-> 注：旧版 AGENTS.md 提到的 `run_simulator.py`、`vod-api.py`、`tests/`、`tools/`、`sample/`
-> 现已**不存在**——相关逻辑已分别迁移进 `src/auth/`、`src/sync/`、`src/api/` 等模块。
+> 注：前端已按 `static/docs/web-ui-refactoring-spec.md` 完成组件化重构（详见该文档）。
 
 ## 技术栈
 - **后端**：FastAPI + Uvicorn，监听 `0.0.0.0:8880`
 - **数据库**：SQLite（`data/iptv.db`，WAL 模式），`init_db()` 在启动时自动建表与迁移
 - **认证算法**：`pycryptodome` 的 DES-ECB 动态算密（Authenticator 签名）
-- **前端**：原生 HTML/CSS/JS（`static/`），无构建步骤
+- **前端**：原生 HTML/CSS/JS（`static/`），Vue3 CDN 模式、无构建步骤；`app.js` 仅作路由壳，业务拆为 `components/` 下 Tab 组件 + `api/` 下 Service 层，样式令牌集中在 `css/tokens.css`
 - **部署**：Docker 多阶段镜像，端口 8880，`data/` 通过 volume 挂载
 
 ## 核心模块说明

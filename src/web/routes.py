@@ -128,7 +128,7 @@ async def save_stb_config(config_in: dict):
 
 @router.post("/api/sync/start")
 async def trigger_sync():
-    """触发后台同步任务。"""
+    """触发后台同步任务（VOD 免登录，与调度器行为一致）。"""
     from src.sync.filter_sync import sync_status, start_sync_background
 
     if sync_status["running"]:
@@ -137,10 +137,11 @@ async def trigger_sync():
             "message": f"正在同步中… {sync_status['progress']}"
         })
 
-    if _simulator is None or not _simulator.state.is_authenticated:
-        return JSONResponse(content={"status": "error", "message": "模拟器未认证，请先配置并登录 STB"})
+    if _simulator is None:
+        return JSONResponse(content={"status": "error", "message": "模拟器未初始化"}, status_code=500)
 
-    start_sync_background(_simulator, _login_func)
+    # VOD 同步免登录（与 scheduler_engine 调度行为一致）
+    start_sync_background(_simulator, None)
     return {"status": "started", "message": "已开始同步数据，请稍候查看进度..."}
 
 
